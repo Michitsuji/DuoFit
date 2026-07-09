@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Heart, Home, PlusCircle, Users, Dumbbell, LogOut, Activity, Flame, Lock, Settings, Trash2, Plus, X, ListPlus, MapPin, Clock, Play, Circle, Edit2, KeyRound, AlignLeft, Sparkles, Scale, Calendar as CalendarIcon, Save, Zap, TrendingDown, LifeBuoy } from 'lucide-react';
+import { Heart, Home, PlusCircle, Users, Dumbbell, LogOut, Activity, Flame, Lock, Settings, Trash2, Plus, X, ListPlus, MapPin, Clock, Play, Circle, Edit2, KeyRound, AlignLeft, Sparkles, Scale, Calendar as CalendarIcon, Save, Zap, TrendingDown, LifeBuoy, GripVertical, Copy, Moon, Sun } from 'lucide-react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
 import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot, enableIndexedDbPersistence } from 'firebase/firestore';
@@ -79,10 +79,11 @@ const formatDateFromTimestamp = (timestamp) => {
 const formatShortDateTime = (timestamp) => {
   if (!timestamp || isNaN(new Date(timestamp).getTime())) return '';
   const date = new Date(timestamp);
-  return `${date.getMonth() + 1}/${date.getDate()} ${String(date.getHours()).padStart(2,'0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+  const days = ['日', '月', '火', '水', '木', '金', '土'];
+  const dayStr = days[date.getDay()];
+  return `${date.getMonth() + 1}/${date.getDate()}(${dayStr}) ${String(date.getHours()).padStart(2,'0')}:${String(date.getMinutes()).padStart(2, '0')}`;
 };
 
-// 総負荷量の計算（特殊セット対応）
 const calcSetVolume = (weight, reps, lReps, rReps, forcedReps, wType) => {
   let v = 0;
   const w = Number(weight) || 0;
@@ -140,9 +141,9 @@ const getVolumeMetaphor = (kg) => {
 // グラフコンポーネント
 function SimpleChart({ data, color, title }) {
   if (!data || data.length === 0) return (
-    <div className="w-full bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col items-center justify-center">
-      <h4 className="text-sm font-bold text-slate-700 mb-4 w-full flex items-center gap-2"><Activity size={16} className="text-slate-400"/> {title}</h4>
-      <p className="text-sm font-bold text-slate-400 bg-slate-50 p-6 rounded-2xl text-center border border-slate-100 w-full">データがありません</p>
+    <div className="w-full bg-white dark:bg-slate-800 p-5 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col items-center justify-center">
+      <h4 className="text-sm font-bold text-slate-700 dark:text-slate-300 mb-4 w-full flex items-center gap-2"><Activity size={16} className="text-slate-400"/> {title}</h4>
+      <p className="text-sm font-bold text-slate-400 bg-slate-50 dark:bg-slate-900 p-6 rounded-2xl text-center border border-slate-100 dark:border-slate-800 w-full">データがありません</p>
     </div>
   );
   const values = data.map(d => d.value).filter(v => !isNaN(v));
@@ -158,18 +159,20 @@ function SimpleChart({ data, color, title }) {
   }).join(' ');
 
   return (
-    <div className="w-full bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
-      <h4 className="text-sm font-bold text-slate-700 mb-6 flex items-center gap-2"><Activity size={16} className="text-slate-400"/> {title}</h4>
-      <div className="relative h-32 w-full pt-4 pl-2 pr-2">
-        <svg viewBox={`-10 -20 ${width + 20} ${height + 40}`} className="w-full h-full overflow-visible">
+    <div className="w-full bg-white dark:bg-slate-800 p-5 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
+      <h4 className="text-sm font-bold text-slate-700 dark:text-slate-300 mb-6 flex items-center gap-2"><Activity size={16} className="text-slate-400"/> {title}</h4>
+      <div className="relative h-40 w-full pt-4 pl-2 pr-2">
+        <svg viewBox={`-10 -20 ${width + 20} ${height + 60}`} className="w-full h-full overflow-visible">
           <polyline points={points} fill="none" stroke={color} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
           {data.map((d, i) => {
             const x = (i / (data.length - 1 || 1)) * width;
             const y = height - ((d.value - min) / range) * height;
+            const dateStr = d.date ? d.date.slice(5, 10).replace('-', '/') : '';
             return (
               <g key={i}>
                 <circle cx={x} cy={y} r="5" fill="white" stroke={color} strokeWidth="2.5" />
                 <text x={x} y={y - 12} fontSize="12" fill={color} textAnchor="middle" className="font-bold tracking-tighter">{d.value}</text>
+                {dateStr && <text x={x} y={height + 25} fontSize="10" fill="#94a3b8" textAnchor="middle" className="font-bold">{dateStr}</text>}
               </g>
             );
           })}
@@ -180,41 +183,41 @@ function SimpleChart({ data, color, title }) {
 }
 
 // --- 共通コンポーネント：ワークアウトカード ---
-function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onToggleLike }) {
+function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onToggleLike, onImport }) {
   const isMyPost = post.author === currentUser;
   const authorInfo = accountsInfo && accountsInfo[post.author];
 
   const renderSetRow = (set, wType, isDrop, label) => {
     const isLR = wType === 'lr';
     const isPlate = wType === 'plate';
-    const forced = set.forcedReps ? <span className="text-rose-500 text-[10px] ml-1">(+{set.forcedReps}補助)</span> : null;
+    const forced = set.forcedReps ? <span className="text-rose-500 text-xs ml-1">(+{set.forcedReps}補助)</span> : null;
 
     return (
-      <div className={`flex justify-between text-sm items-center border-b border-slate-200/50 pb-1.5 pt-1.5 last:border-0 ${isDrop ? 'pl-8 text-slate-500' : ''}`}>
-        <span className={`font-bold w-12 text-xs shrink-0 ${isDrop ? 'text-orange-500' : 'text-slate-500'}`}>
+      <div className={`flex justify-between items-center border-b border-slate-200/50 dark:border-slate-700 pb-2 pt-2 last:border-0 ${isDrop ? 'pl-8' : ''}`}>
+        <span className={`font-bold w-14 text-sm shrink-0 ${isDrop ? 'text-orange-500' : 'text-slate-500 dark:text-slate-400'}`}>
           {isDrop ? `↳ drop` : label}
         </span>
         {isLR ? (
-           <div className="flex-1 flex justify-between items-center px-1">
-             <span className="font-bold text-slate-700 text-center w-14 shrink-0">
-               {set.weight || 0} <span className="text-[10px] font-bold text-slate-400 ml-0.5">kg</span>
+           <div className="flex-1 flex justify-between items-center px-1 gap-2">
+             <span className="font-bold text-lg tracking-wide text-slate-800 dark:text-slate-100 text-center w-20 shrink-0">
+               {set.weight || 0} <span className="text-xs font-normal text-slate-400 dark:text-slate-500 ml-0.5">kg</span>
              </span>
-             <span className="font-bold text-slate-700 flex-1 text-right">
-               L:{set.lReps || 0} <span className="text-slate-400 font-normal mx-0.5">/</span> R:{set.rReps || 0}
-               <span className="text-[10px] font-bold text-slate-400 ml-0.5">回</span>
+             <span className="font-bold text-lg tracking-wide text-slate-800 dark:text-slate-100 flex-1 text-right">
+               L:{set.lReps || 0} <span className="text-slate-300 dark:text-slate-600 font-normal mx-1">/</span> R:{set.rReps || 0}
+               <span className="text-xs font-normal text-slate-400 dark:text-slate-500 ml-0.5">回</span>
                {forced}
              </span>
            </div>
         ) : (
-           <div className="flex-1 flex justify-between items-center px-1">
-             <span className="font-bold text-slate-700 text-center flex-1">
+           <div className="flex-1 flex justify-between items-center px-1 gap-2">
+             <span className="font-bold text-lg tracking-wide text-slate-800 dark:text-slate-100 text-center flex-1">
                {set.weight || 0} 
-               <span className="text-[10px] font-bold text-slate-400 ml-0.5">
+               <span className="text-xs font-normal text-slate-400 dark:text-slate-500 ml-1">
                  {isPlate ? '枚' : (wType === 'oneSide' ? 'kg(片)' : 'kg')}
                </span>
              </span>
-             <span className="font-bold text-slate-700 w-16 text-right shrink-0">
-               {set.reps || 0} <span className="text-[10px] font-bold text-slate-400">回</span>
+             <span className="font-bold text-lg tracking-wide text-slate-800 dark:text-slate-100 w-24 text-right shrink-0">
+               {set.reps || 0} <span className="text-xs font-normal text-slate-400 dark:text-slate-500 ml-0.5">回</span>
                {forced}
              </span>
            </div>
@@ -224,33 +227,33 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
   };
 
   return (
-    <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm overflow-hidden relative mb-4">
-      <div className={`absolute top-0 left-0 w-1.5 h-full ${isMyPost ? 'bg-slate-300' : 'bg-emerald-400'}`}></div>
+    <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-5 shadow-sm overflow-hidden relative mb-4">
+      <div className={`absolute top-0 left-0 w-1.5 h-full ${isMyPost ? 'bg-slate-300 dark:bg-slate-600' : 'bg-emerald-400'}`}></div>
       <div className="flex justify-between items-start mb-4 pl-3">
-        <div className="flex items-center gap-3">
-          <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-white shadow-sm overflow-hidden ${isMyPost ? 'bg-slate-600' : (post.author === '勇太' ? 'bg-indigo-500' : 'bg-rose-500')}`}>
+        <div className="flex items-center gap-3 w-full overflow-hidden">
+          <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-white shadow-sm overflow-hidden shrink-0 ${isMyPost ? 'bg-slate-600' : (post.author === '勇太' ? 'bg-indigo-500' : 'bg-rose-500')}`}>
             {authorInfo?.photoUrl ? <img src={authorInfo.photoUrl} alt={post.author} className="w-full h-full object-cover" /> : post.author ? post.author.charAt(0) : '?'}
           </div>
-          <div>
-            <p className="font-bold text-slate-800">{post.author || '不明'}</p>
-            <div className="flex items-center gap-2 text-xs text-slate-500 font-bold flex-wrap">
+          <div className="flex-1 min-w-0">
+            <p className="font-bold text-slate-800 dark:text-slate-100 truncate">{post.author || '不明'}</p>
+            <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400 font-bold overflow-x-auto whitespace-nowrap scrollbar-hide pb-1 w-full">
               <span>{formatShortDateTime(post.timestamp)}</span>
-              {post.gymName && <><span className="text-slate-300">•</span><span className="flex items-center gap-0.5 text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded"><MapPin size={10}/> {post.gymName}</span></>}
-              {post.duration && <><span className="text-slate-300">•</span><span className="flex items-center gap-0.5 text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded"><Clock size={10}/> {formatDuration(post.duration)}</span></>}
+              {post.gymName && <><span className="text-slate-300 dark:text-slate-600">•</span><span className="flex items-center gap-0.5 text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 px-1.5 py-0.5 rounded"><MapPin size={10}/> {post.gymName}</span></>}
+              {post.duration && <><span className="text-slate-300 dark:text-slate-600">•</span><span className="flex items-center gap-0.5 text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-700 px-1.5 py-0.5 rounded"><Clock size={10}/> {formatDuration(post.duration)}</span></>}
             </div>
           </div>
         </div>
         {isMyPost && onEdit && onDelete && (
-          <div className="flex gap-2">
-            <button onClick={() => onEdit(post)} className="text-slate-400 hover:text-emerald-500 p-1.5 rounded-lg hover:bg-slate-50 transition-colors"><Edit2 size={16} /></button>
-            <button onClick={() => onDelete(post.id)} className="text-slate-400 hover:text-rose-500 p-1.5 rounded-lg hover:bg-slate-50 transition-colors"><Trash2 size={16} /></button>
+          <div className="flex gap-1 shrink-0 ml-2">
+            <button onClick={() => onEdit(post)} className="text-slate-400 hover:text-emerald-500 p-1.5 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"><Edit2 size={16} /></button>
+            <button onClick={() => onDelete(post.id)} className="text-slate-400 hover:text-rose-500 p-1.5 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"><Trash2 size={16} /></button>
           </div>
         )}
       </div>
 
       {(post.bodyWeight || post.bodyFat) && (
         <div className="pl-3 mb-3 flex gap-2">
-          <div className="flex items-center gap-1.5 bg-indigo-50 text-indigo-600 text-xs font-bold px-2.5 py-1 rounded-md border border-indigo-100">
+          <div className="flex items-center gap-1.5 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 text-xs font-bold px-2.5 py-1 rounded-md border border-indigo-100 dark:border-indigo-800">
             <Scale size={14} />
             {post.bodyWeight && `${post.bodyWeight}kg`}
             {post.bodyWeight && post.bodyFat && ' / '}
@@ -260,25 +263,26 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
       )}
       {(post.volume && !isNaN(post.volume) && post.volume > 0) ? (
         <div className="pl-3 mb-4">
-          <div className="inline-flex items-center gap-2 bg-slate-100 text-slate-600 text-xs font-bold px-3 py-1.5 rounded-lg border border-slate-200">
+          <div className="inline-flex items-center gap-2 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 text-xs font-bold px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-600">
             <Flame size={14} className="text-orange-500" />
             総負荷量: {Number(post.volume).toLocaleString()}kg
-            <span className="text-slate-400 font-normal">（{getVolumeMetaphor(post.volume)}）</span>
+            <span className="text-slate-400 dark:text-slate-400 font-normal">（{getVolumeMetaphor(post.volume)}）</span>
           </div>
         </div>
       ) : null}
 
       <div className="pl-3 space-y-3 mb-4">
         {post.items && Array.isArray(post.items) && post.items.map((item, idx) => (
-          <div key={idx} className="bg-slate-50 rounded-xl p-3 border border-slate-100">
-            <div className="flex items-center gap-2 mb-2 flex-wrap">
-              <Dumbbell size={14} className="text-emerald-500" />
-              <span className="font-bold text-slate-800 text-sm">{item.exerciseName}</span>
-              {item.isSuperSet && item.superExerciseName && (
-                <span className="font-bold text-indigo-600 text-sm flex items-center gap-1"><Zap size={14} className="text-indigo-400"/> {item.superExerciseName}</span>
-              )}
-              {item.category && <span className="text-[10px] text-emerald-600 font-bold bg-emerald-100 px-1.5 py-0.5 rounded">{item.category}</span>}
-              {item.maker && <span className="text-[10px] text-slate-400 font-bold bg-slate-200 px-1.5 py-0.5 rounded">{item.maker}</span>}
+          <div key={idx} className="bg-slate-50 dark:bg-slate-700/50 rounded-xl p-3 border border-slate-100 dark:border-slate-700">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2 flex-wrap flex-1">
+                <Dumbbell size={14} className="text-emerald-500" />
+                <span className="font-bold text-slate-800 dark:text-slate-100 text-[15px]">{item.exerciseName}</span>
+                {item.isSuperSet && item.superExerciseName && (
+                  <span className="font-bold text-indigo-600 dark:text-indigo-400 text-sm flex items-center gap-1"><Zap size={14} className="text-indigo-400"/> {item.superExerciseName}</span>
+                )}
+                {item.category && <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold bg-emerald-100 dark:bg-emerald-900/50 px-1.5 py-0.5 rounded">{item.category}</span>}
+              </div>
             </div>
 
             <div className="space-y-1">
@@ -294,7 +298,7 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
             </div>
 
             {item.memo && (
-              <div className="mt-2 text-sm text-slate-600 bg-white p-2 rounded border border-slate-200">
+              <div className="mt-2 text-sm text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-800 p-2 rounded border border-slate-200 dark:border-slate-700">
                 <AlignLeft size={12} className="inline mr-1 text-slate-400"/>{item.memo}
               </div>
             )}
@@ -302,16 +306,22 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
         ))}
       </div>
 
-      <div className="flex items-center gap-4 pl-3">
+      <div className="flex items-center justify-between pl-3 mt-4">
         {isMyPost ? (
-          <div className="flex items-center gap-2 px-3 py-2 text-sm font-bold text-slate-400">
+          <div className="flex items-center gap-2 px-3 py-2 text-sm font-bold text-slate-400 dark:text-slate-500">
             <Heart size={16} className={post.likes > 0 ? "text-rose-400" : ""} fill={post.likes > 0 ? "currentColor" : "none"} />
             {post.likes > 0 ? 'ナイス！' : 'ナイス待ち'}
           </div>
         ) : (
-          <button onClick={() => onToggleLike(post.id, post.likes || 0, post.likedByMe)} className={`flex items-center gap-2 px-4 py-2 rounded-full transition-all text-sm font-bold ${post.likedByMe ? 'bg-rose-50 text-rose-500 border border-rose-200' : 'bg-slate-50 text-slate-500 hover:bg-slate-100 border border-slate-200'}`}>
+          <button onClick={() => onToggleLike(post.id, post.likes || 0, post.likedByMe)} className={`flex items-center gap-2 px-4 py-2 rounded-full transition-all text-sm font-bold ${post.likedByMe ? 'bg-rose-50 dark:bg-rose-900/30 text-rose-500 border border-rose-200 dark:border-rose-800' : 'bg-slate-50 dark:bg-slate-700 text-slate-500 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-600 border border-slate-200 dark:border-slate-600'}`}>
             <Heart size={16} fill={post.likedByMe ? "currentColor" : "none"} className={post.likedByMe ? "animate-pulse" : ""} />
             ナイス！
+          </button>
+        )}
+        
+        {onImport && (
+          <button onClick={() => onImport(post)} className="flex items-center gap-1.5 text-xs font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 px-3 py-2 rounded-lg hover:bg-emerald-100 dark:hover:bg-emerald-900/50 transition-colors border border-emerald-100 dark:border-emerald-800">
+            <Copy size={14} /> この構成で開始
           </button>
         )}
       </div>
@@ -320,7 +330,7 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
 }
 
 // --- 共通コンポーネント：ワークアウト入力フォーム ---
-function WorkoutItemForm({ item, availableExercises, updateItem, removeItem, addSet, removeSet, updateSet, addDropSet, removeDropSet, updateDropSet }) {
+function WorkoutItemForm({ item, index, availableExercises, updateItem, removeItem, addSet, removeSet, updateSet, addDropSet, removeDropSet, updateDropSet, onDragStart, onDragOver, onDragEnd }) {
   
   const updateExerciseName = (newName, isSuper = false) => {
     const exData = availableExercises.find(ex => ex.name === newName);
@@ -357,55 +367,64 @@ function WorkoutItemForm({ item, availableExercises, updateItem, removeItem, add
     };
 
     return (
-      <div className="flex-1 flex gap-1.5 min-w-0">
+      <div className="flex-1 flex gap-2 min-w-0">
         {isLR ? (
           <>
-            <input type="number" value={val('weight')} onChange={(e) => update('weight', e.target.value)} placeholder="重量" className="w-[52px] shrink-0 text-center text-sm font-bold text-slate-800 bg-white border border-slate-200 rounded focus:outline-none focus:border-emerald-500 py-1.5 px-0" style={{ fontSize: '16px' }}/>
-            <div className="flex flex-1 items-center gap-0.5 border border-slate-200 bg-white rounded p-1 min-w-0">
-              <span className="text-[10px] text-slate-400 font-bold pl-0.5 shrink-0">L:</span>
-              <input type="number" value={val('lReps')} onChange={(e) => update('lReps', e.target.value)} placeholder="0" className="w-full text-center text-sm font-bold text-slate-800 bg-transparent focus:outline-none min-w-0" style={{ fontSize: '16px' }}/>
+            <input type="number" value={val('weight')} onChange={(e) => update('weight', e.target.value)} placeholder="重量" className="w-[60px] shrink-0 text-center text-base font-bold text-slate-800 dark:text-slate-100 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded focus:outline-none focus:border-emerald-500 py-2 px-0" style={{ fontSize: '16px' }}/>
+            <div className="flex flex-1 items-center gap-1 border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 rounded px-2 min-w-0">
+              <span className="text-xs text-slate-400 font-bold shrink-0">L:</span>
+              <input type="number" value={val('lReps')} onChange={(e) => update('lReps', e.target.value)} placeholder="0" className="w-full text-center text-base font-bold text-slate-800 dark:text-slate-100 bg-transparent focus:outline-none min-w-0" style={{ fontSize: '16px' }}/>
             </div>
-            <div className="flex flex-1 items-center gap-0.5 border border-slate-200 bg-white rounded p-1 min-w-0">
-              <span className="text-[10px] text-slate-400 font-bold pl-0.5 shrink-0">R:</span>
-              <input type="number" value={val('rReps')} onChange={(e) => update('rReps', e.target.value)} placeholder="0" className="w-full text-center text-sm font-bold text-slate-800 bg-transparent focus:outline-none min-w-0" style={{ fontSize: '16px' }}/>
+            <div className="flex flex-1 items-center gap-1 border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 rounded px-2 min-w-0">
+              <span className="text-xs text-slate-400 font-bold shrink-0">R:</span>
+              <input type="number" value={val('rReps')} onChange={(e) => update('rReps', e.target.value)} placeholder="0" className="w-full text-center text-base font-bold text-slate-800 dark:text-slate-100 bg-transparent focus:outline-none min-w-0" style={{ fontSize: '16px' }}/>
             </div>
           </>
         ) : (
           <>
-            <input type="number" value={val('weight')} onChange={(e) => update('weight', e.target.value)} placeholder="0" className="flex-1 min-w-0 bg-white border border-slate-200 rounded py-1.5 px-1 text-center text-slate-800 font-bold focus:outline-none focus:border-emerald-500 text-sm" style={{ fontSize: '16px' }}/>
-            <input type="number" value={val('reps')} onChange={(e) => update('reps', e.target.value)} placeholder="0" className="flex-1 min-w-0 bg-white border border-slate-200 rounded py-1.5 px-1 text-center text-slate-800 font-bold focus:outline-none focus:border-emerald-500 text-sm" style={{ fontSize: '16px' }}/>
+            <input type="number" value={val('weight')} onChange={(e) => update('weight', e.target.value)} placeholder="0" className="flex-1 min-w-0 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded py-2 px-2 text-center text-slate-800 dark:text-slate-100 font-bold focus:outline-none focus:border-emerald-500 text-base" style={{ fontSize: '16px' }}/>
+            <input type="number" value={val('reps')} onChange={(e) => update('reps', e.target.value)} placeholder="0" className="flex-1 min-w-0 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded py-2 px-2 text-center text-slate-800 dark:text-slate-100 font-bold focus:outline-none focus:border-emerald-500 text-base" style={{ fontSize: '16px' }}/>
           </>
         )}
         {item.isForcedReps && (
-          <input type="number" value={val('forcedReps')} onChange={(e) => update('forcedReps', e.target.value)} placeholder="+補" className="w-10 shrink-0 text-center text-xs font-bold text-rose-600 bg-rose-50 border border-rose-200 rounded focus:outline-none focus:border-rose-500 py-1.5 px-0" style={{ fontSize: '16px' }}/>
+          <input type="number" value={val('forcedReps')} onChange={(e) => update('forcedReps', e.target.value)} placeholder="+補" className="w-12 shrink-0 text-center text-sm font-bold text-rose-600 bg-rose-50 dark:bg-rose-900/30 border border-rose-200 dark:border-rose-800 rounded focus:outline-none focus:border-rose-500 py-2 px-0" style={{ fontSize: '16px' }}/>
         )}
       </div>
     );
   };
 
   return (
-    <div className="bg-white border border-slate-200 rounded-2xl p-3 shadow-sm relative w-full overflow-hidden mb-6">
-      <div className="flex justify-between items-center mb-3">
-        <div className="relative flex-1 min-w-0">
-          <select value={item.exerciseName} onChange={(e) => updateExerciseName(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-800 font-bold appearance-none focus:outline-none focus:border-emerald-500 text-base pr-8" style={{ fontSize: '16px' }}>
-            <option value="" disabled>種目を選択</option>
-            {availableExercises.map(ex => <option key={ex.id} value={ex.name}>{ex.name}{ex.maker ? `（${ex.maker}）` : ''}</option>)}
-          </select>
-          <div className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none text-xs">▼</div>
+    <div 
+      draggable
+      onDragStart={(e) => onDragStart && onDragStart(e, index)}
+      onDragOver={(e) => onDragOver && onDragOver(e, index)}
+      onDragEnd={onDragEnd}
+      className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-4 shadow-sm relative w-full overflow-hidden mb-6 transition-all duration-200"
+    >
+      <div className="flex justify-between items-center mb-4">
+        <div className="flex items-center gap-2 flex-1 min-w-0">
+          <div className="cursor-move p-1 text-slate-300 hover:text-slate-500 active:cursor-grabbing rounded"><GripVertical size={20} /></div>
+          <div className="relative flex-1 min-w-0">
+            <select value={item.exerciseName} onChange={(e) => updateExerciseName(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2.5 text-slate-800 dark:text-slate-100 font-bold appearance-none focus:outline-none focus:border-emerald-500 text-base pr-8" style={{ fontSize: '16px' }}>
+              <option value="" disabled>種目を選択</option>
+              {availableExercises.map(ex => <option key={ex.id} value={ex.name}>{ex.name}{ex.maker ? `（${ex.maker}）` : ''}</option>)}
+            </select>
+            <div className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none text-xs">▼</div>
+          </div>
         </div>
-        <button onClick={() => removeItem(item.id)} className="ml-2 text-slate-400 hover:text-rose-500 p-2 flex-shrink-0 bg-slate-50 rounded-lg transition-colors"><Trash2 size={16} /></button>
+        <button onClick={() => removeItem(item.id)} className="ml-2 text-slate-400 hover:text-rose-500 p-2 flex-shrink-0 bg-slate-50 dark:bg-slate-700 rounded-lg transition-colors"><Trash2 size={18} /></button>
       </div>
 
-      <div className="flex gap-2 mb-4 overflow-x-auto scrollbar-hide py-1">
-        <button onClick={() => updateItem(item.id, { isSuperSet: !item.isSuperSet })} className={`whitespace-nowrap px-3 py-1.5 text-xs font-bold rounded-full border transition-colors ${item.isSuperSet ? 'bg-indigo-50 border-indigo-300 text-indigo-700' : 'bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100'}`}>スーパー</button>
-        <button onClick={() => updateItem(item.id, { isDropSet: !item.isDropSet })} className={`whitespace-nowrap px-3 py-1.5 text-xs font-bold rounded-full border transition-colors ${item.isDropSet ? 'bg-orange-50 border-orange-300 text-orange-700' : 'bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100'}`}>ドロップ</button>
-        <button onClick={() => updateItem(item.id, { isForcedReps: !item.isForcedReps })} className={`whitespace-nowrap px-3 py-1.5 text-xs font-bold rounded-full border transition-colors ${item.isForcedReps ? 'bg-rose-50 border-rose-300 text-rose-700' : 'bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100'}`}>補助</button>
+      <div className="flex gap-2 mb-5 overflow-x-auto scrollbar-hide py-1 pl-8">
+        <button onClick={() => updateItem(item.id, { isSuperSet: !item.isSuperSet })} className={`whitespace-nowrap px-3 py-1.5 text-xs font-bold rounded-full border transition-colors ${item.isSuperSet ? 'bg-indigo-50 dark:bg-indigo-900/40 border-indigo-300 dark:border-indigo-700 text-indigo-700 dark:text-indigo-300' : 'bg-slate-50 dark:bg-slate-700 border-slate-200 dark:border-slate-600 text-slate-500 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-600'}`}>スーパー</button>
+        <button onClick={() => updateItem(item.id, { isDropSet: !item.isDropSet })} className={`whitespace-nowrap px-3 py-1.5 text-xs font-bold rounded-full border transition-colors ${item.isDropSet ? 'bg-orange-50 dark:bg-orange-900/40 border-orange-300 dark:border-orange-700 text-orange-700 dark:text-orange-300' : 'bg-slate-50 dark:bg-slate-700 border-slate-200 dark:border-slate-600 text-slate-500 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-600'}`}>ドロップ</button>
+        <button onClick={() => updateItem(item.id, { isForcedReps: !item.isForcedReps })} className={`whitespace-nowrap px-3 py-1.5 text-xs font-bold rounded-full border transition-colors ${item.isForcedReps ? 'bg-rose-50 dark:bg-rose-900/40 border-rose-300 dark:border-rose-700 text-rose-700 dark:text-rose-300' : 'bg-slate-50 dark:bg-slate-700 border-slate-200 dark:border-slate-600 text-slate-500 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-600'}`}>補助</button>
       </div>
 
       {item.isSuperSet && (
-        <div className="mb-4 pl-3 border-l-2 border-indigo-300">
+        <div className="mb-5 pl-8 border-l-2 border-indigo-300 dark:border-indigo-600">
           <div className="relative w-full">
-            <select value={item.superExerciseName || ''} onChange={(e) => updateExerciseName(e.target.value, true)} className="w-full bg-indigo-50/30 border border-indigo-100 rounded-lg px-3 py-1.5 text-indigo-800 font-bold appearance-none focus:outline-none focus:border-indigo-300 text-sm pr-8" style={{ fontSize: '16px' }}>
+            <select value={item.superExerciseName || ''} onChange={(e) => updateExerciseName(e.target.value, true)} className="w-full bg-indigo-50/30 dark:bg-indigo-900/20 border border-indigo-100 dark:border-indigo-800 rounded-lg px-3 py-2 text-indigo-800 dark:text-indigo-300 font-bold appearance-none focus:outline-none focus:border-indigo-300 text-base pr-8" style={{ fontSize: '16px' }}>
               <option value="" disabled>スーパーセットの種目</option>
               {availableExercises.map(ex => <option key={ex.id} value={ex.name}>{ex.name}</option>)}
             </select>
@@ -414,59 +433,59 @@ function WorkoutItemForm({ item, availableExercises, updateItem, removeItem, add
         </div>
       )}
 
-      <div className="space-y-3 mb-4 w-full">
-        <div className="flex text-[10px] text-slate-500 font-bold px-1">
-          <div className="w-8 text-center shrink-0">Set</div>
+      <div className="space-y-3 mb-5 w-full pl-2">
+        <div className="flex text-xs text-slate-500 dark:text-slate-400 font-bold px-1">
+          <div className="w-10 text-center shrink-0">Set</div>
           {item.weightType === 'lr' ? (
-            <div className="flex-1 flex gap-1.5 px-0 min-w-0">
-              <span className="w-[52px] text-center shrink-0">重量</span>
-              <span className="flex-1 text-center text-slate-400">左(回) / 右(回)</span>
+            <div className="flex-1 flex gap-2 px-0 min-w-0">
+              <span className="w-[60px] text-center shrink-0">重量</span>
+              <span className="flex-1 text-center">左(回) / 右(回)</span>
             </div>
           ) : (
             <><div className="flex-1 text-center min-w-0">{getWeightPlaceholder(item.weightType)}</div><div className="flex-1 text-center min-w-0">Reps</div></>
           )}
-          {item.isForcedReps && <div className="w-10 text-center text-rose-400 shrink-0">+補助</div>}
+          {item.isForcedReps && <div className="w-12 text-center text-rose-400 shrink-0">+補助</div>}
           <div className="w-6 shrink-0"></div>
         </div>
         
         {item.sets && Array.isArray(item.sets) && item.sets.map((set, sIndex) => (
-          <div key={set.id} className="bg-slate-50/50 p-2 rounded-xl border border-slate-100 space-y-2">
-            <div className="flex items-center gap-1">
-              <div className="w-8 text-center text-slate-400 font-bold text-xs shrink-0">set {sIndex + 1}</div>
+          <div key={set.id} className="bg-slate-50/50 dark:bg-slate-700/30 p-2.5 rounded-xl border border-slate-100 dark:border-slate-700 space-y-3">
+            <div className="flex items-center gap-2">
+              <div className="w-10 text-center text-slate-400 dark:text-slate-500 font-bold text-sm shrink-0">{sIndex + 1}</div>
               {renderInputRow(set, item.weightType, false, false)}
-              <button onClick={() => removeSet(item.id, set.id)} disabled={item.sets.length === 1} className="w-6 flex-shrink-0 text-slate-400 hover:text-rose-500 disabled:opacity-30 flex justify-center"><X size={16} /></button>
+              <button onClick={() => removeSet(item.id, set.id)} disabled={item.sets.length === 1} className="w-6 flex-shrink-0 text-slate-400 hover:text-rose-500 disabled:opacity-30 flex justify-center"><X size={18} /></button>
             </div>
 
             {item.isSuperSet && (
-              <div className="flex items-center gap-1 pl-8 mt-1 border-l-2 border-indigo-200 ml-1">
-                <Zap size={14} className="text-indigo-400 flex-shrink-0" />
+              <div className="flex items-center gap-2 pl-8 mt-2 border-l-2 border-indigo-200 dark:border-indigo-700 ml-1">
+                <Zap size={16} className="text-indigo-400 flex-shrink-0" />
                 {renderInputRow(set, item.superWeightType || 'total', true, false)}
                 <div className="w-6 shrink-0"></div>
               </div>
             )}
 
             {item.isDropSet && (
-              <div className="pl-6 mt-2 space-y-2">
+              <div className="pl-6 mt-3 space-y-3">
                 {set.dropSets && set.dropSets.map(ds => (
-                  <div key={ds.id} className="flex items-center gap-1 border-l-2 border-orange-200 pl-2">
-                    <TrendingDown size={14} className="text-orange-400 flex-shrink-0" />
+                  <div key={ds.id} className="flex items-center gap-2 border-l-2 border-orange-200 dark:border-orange-700 pl-2">
+                    <TrendingDown size={16} className="text-orange-400 flex-shrink-0" />
                     {renderInputRow({ ...ds, _parentId: set.id }, item.weightType, false, true, ds.id)}
-                    <button onClick={() => removeDropSet(item.id, set.id, ds.id)} className="w-6 flex-shrink-0 text-slate-400 hover:text-rose-500 flex justify-center"><X size={16} /></button>
+                    <button onClick={() => removeDropSet(item.id, set.id, ds.id)} className="w-6 flex-shrink-0 text-slate-400 hover:text-rose-500 flex justify-center"><X size={18} /></button>
                   </div>
                 ))}
-                <button onClick={() => addDropSet(item.id, set.id)} className="ml-6 text-[10px] text-orange-600 bg-orange-50 hover:bg-orange-100 border border-orange-200 px-2 py-1 rounded transition-colors font-bold flex items-center gap-1"><Plus size={10}/>ドロップ追加</button>
+                <button onClick={() => addDropSet(item.id, set.id)} className="ml-8 text-xs text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-900/30 hover:bg-orange-100 dark:hover:bg-orange-900/50 border border-orange-200 dark:border-orange-800 px-3 py-1.5 rounded transition-colors font-bold flex items-center gap-1"><Plus size={12}/>ドロップ追加</button>
               </div>
             )}
           </div>
         ))}
       </div>
 
-      <button onClick={() => addSet(item.id)} className="w-full py-2.5 border border-dashed border-slate-300 text-slate-500 rounded-xl text-sm font-bold flex items-center justify-center gap-2 hover:bg-slate-50 transition-colors mb-4 bg-white">
-        <Plus size={16} /> セットを追加
+      <button onClick={() => addSet(item.id)} className="w-full py-3 border border-dashed border-slate-300 dark:border-slate-600 text-slate-500 dark:text-slate-400 rounded-xl text-sm font-bold flex items-center justify-center gap-2 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors mb-4 bg-white dark:bg-slate-800">
+        <Plus size={18} /> セットを追加
       </button>
 
       <div>
-        <textarea value={item.memo || ''} onChange={(e) => updateItem(item.id, { memo: e.target.value })} placeholder="種目ごとのメモ（オプション）" className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm text-slate-700 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 focus:outline-none resize-none" style={{ fontSize: '16px' }} rows={2} />
+        <textarea value={item.memo || ''} onChange={(e) => updateItem(item.id, { memo: e.target.value })} placeholder="種目ごとのメモ（オプション）" className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl p-3 text-sm text-slate-700 dark:text-slate-200 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 focus:outline-none resize-none" style={{ fontSize: '16px' }} rows={2} />
       </div>
     </div>
   );
@@ -550,7 +569,7 @@ export default function App() {
     if (!db) return false;
     const accountData = accountsInfo[userId];
     if (!accountData || !accountData.pin) {
-      try { await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', userId), { pin: pin, isTraining: false, lastActive: Date.now() }); setCurrentUser(userId); } catch (e) {}
+      try { await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', userId), { pin: pin, isTraining: false, lastActive: Date.now(), theme: 'light' }); setCurrentUser(userId); } catch (e) {}
     } else if (accountData.pin === pin) {
       setCurrentUser(userId);
       try { await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', userId), { lastActive: Date.now() }, { merge: true }); } catch (e) {}
@@ -608,14 +627,24 @@ export default function App() {
     try { await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), { isTraining: false, trainingStartTime: null, currentGymId: null, lastActive: Date.now() }, { merge: true }); setDraftWorkoutItems([]); setCurrentTab('timeline'); } catch (e) {}
   };
 
-  const handleSaveProfilePhoto = async (photoUrl) => {
+  const handleSaveProfile = async (data) => {
     if (!currentUser || !db) return;
-    try { await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), { photoUrl: photoUrl === null ? null : photoUrl }, { merge: true }); setShowProfileModal(false); } catch (e) {}
+    try { await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), data, { merge: true }); setShowProfileModal(false); } catch (e) {}
   };
 
   const toggleLike = async (postId, currentLikes, isCurrentlyLiked) => {
     if (!db) return;
     try { await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'workouts', postId), { likes: isCurrentlyLiked ? Math.max(0, currentLikes - 1) : currentLikes + 1, likedByMe: !isCurrentlyLiked }, { merge: true }); } catch (e) {}
+  };
+
+  const handleImportWorkout = (post) => {
+    const newItems = post.items.map(item => ({
+      ...item,
+      id: generateId(),
+      sets: item.sets.map(set => ({ ...set, id: generateId() }))
+    }));
+    setDraftWorkoutItems(newItems);
+    setCurrentTab('record');
   };
 
   const allGyms = useMemo(() => [{ id: 'common', name: 'ジム共通', createdAt: 0 }, ...gyms], [gyms]);
@@ -639,29 +668,30 @@ export default function App() {
   const partnerIsTraining = partnerInfo?.isTraining || false;
   const myInfo = accountsInfo[currentUser] || {};
   const isSameGym = Boolean(myInfo.isTraining && partnerIsTraining && myInfo.currentGymId && partnerInfo?.currentGymId && (myInfo.currentGymId === partnerInfo.currentGymId));
+  const isDarkMode = myInfo.theme === 'dark';
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-800 font-sans pb-32 overflow-x-hidden selection:bg-emerald-200">
-      <header className="bg-white border-b border-slate-200 sticky top-0 z-20 shadow-sm flex flex-col">
+    <div className={`min-h-screen font-sans pb-32 overflow-x-hidden selection:bg-emerald-200 transition-colors duration-300 ${isDarkMode ? 'dark bg-slate-900 text-slate-100' : 'bg-slate-50 text-slate-800'}`}>
+      <header className="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 sticky top-0 z-20 shadow-sm flex flex-col">
         {isSameGym && (
           <div className="bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-500 px-4 py-2 flex items-center justify-center gap-2 text-white text-xs font-bold animate-pulse shadow-inner">
             <span>🔥 パートナーと同じジムでトレーニング中！ 🔥</span>
           </div>
         )}
         <div className="p-4 flex justify-between items-center">
-          <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
             <Activity className="text-emerald-500" /> Duo<span className="text-emerald-500">Fit</span>
           </h1>
           <div className="flex items-center gap-3">
-            <div className="flex items-center gap-1.5 bg-slate-50 px-2 py-1.5 rounded-full border border-slate-200">
+            <div className="flex items-center gap-1.5 bg-slate-50 dark:bg-slate-900 px-2 py-1.5 rounded-full border border-slate-200 dark:border-slate-700 hidden sm:flex">
               <div className={`w-2 h-2 rounded-full ${isOnline ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.5)]'}`}></div>
-              <span className="text-[10px] font-bold text-slate-500">{isOnline ? 'オンライン' : 'オフライン'}</span>
+              <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400">{isOnline ? 'オンライン' : 'オフライン'}</span>
             </div>
-            <button onClick={() => setShowProfileModal(true)} className="flex items-center gap-2 bg-slate-100 px-3 py-1.5 rounded-full border border-slate-200 hover:bg-slate-200 transition-colors">
-              <div className="w-6 h-6 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-700 font-bold text-xs overflow-hidden border border-emerald-200">
+            <button onClick={() => setShowProfileModal(true)} className="flex items-center gap-2 bg-slate-100 dark:bg-slate-700 px-3 py-1.5 rounded-full border border-slate-200 dark:border-slate-600 hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors">
+              <div className="w-6 h-6 rounded-full bg-emerald-100 dark:bg-emerald-900 flex items-center justify-center text-emerald-700 dark:text-emerald-400 font-bold text-xs overflow-hidden border border-emerald-200 dark:border-emerald-800">
                 {myInfo.photoUrl ? <img src={myInfo.photoUrl} alt="profile" className="w-full h-full object-cover" /> : currentUser.charAt(0)}
               </div>
-              <span className="text-sm font-bold text-slate-700 hidden sm:inline">{currentUser}</span>
+              <span className="text-sm font-bold text-slate-700 dark:text-slate-200 hidden sm:inline">{currentUser}</span>
             </button>
             <button onClick={handleLogout} className="text-slate-400 hover:text-rose-500 p-1.5 rounded-full transition-colors"><LogOut size={20} /></button>
           </div>
@@ -674,7 +704,7 @@ export default function App() {
       </header>
 
       <main className="p-4 max-w-md mx-auto w-full">
-        {currentTab === 'timeline' && <TimelineView posts={posts} onToggleLike={toggleLike} currentUser={currentUser} onDelete={handleDeleteWorkout} onEdit={setEditingPost} accountsInfo={accountsInfo} />}
+        {currentTab === 'timeline' && <TimelineView posts={posts} onToggleLike={toggleLike} onImport={handleImportWorkout} currentUser={currentUser} onDelete={handleDeleteWorkout} onEdit={setEditingPost} accountsInfo={accountsInfo} />}
         {currentTab === 'exercises' && <ExercisesView gyms={allGyms} exercises={exercises} />}
         {currentTab === 'record' && <RecordView onStart={handleStartTraining} onPost={handlePostWorkout} onCancel={handleCancelTraining} myInfo={myInfo} gyms={allGyms} exercises={exercises} workoutItems={draftWorkoutItems} setWorkoutItems={setDraftWorkoutItems} />}
         {currentTab === 'data' && <DataView posts={posts} currentUser={currentUser} accountsInfo={accountsInfo} onEdit={setEditingPost} onDelete={handleDeleteWorkout} />}
@@ -683,7 +713,7 @@ export default function App() {
 
       {editingPost && <EditWorkoutModal post={editingPost} gyms={allGyms} exercises={exercises} onClose={() => setEditingPost(null)} onSave={handleUpdateWorkout} />}
 
-      <nav className="fixed bottom-0 w-full bg-white border-t border-slate-200 pb-safe z-30">
+      <nav className="fixed bottom-0 w-full bg-white dark:bg-slate-800 border-t border-slate-200 dark:border-slate-700 pb-safe z-30 transition-colors">
         <div className="flex justify-around items-center p-2 max-w-md mx-auto">
           <NavButton icon={<Home size={22} />} label="ホーム" isActive={currentTab === 'timeline'} onClick={() => setCurrentTab('timeline')} />
           <NavButton icon={<Dumbbell size={22} />} label="種目" isActive={currentTab === 'exercises'} onClick={() => setCurrentTab('exercises')} />
@@ -693,14 +723,26 @@ export default function App() {
         </div>
       </nav>
 
-      <ProfileModal isOpen={showProfileModal} onClose={() => setShowProfileModal(false)} currentPhotoUrl={myInfo.photoUrl} onSave={handleSaveProfilePhoto} />
+      <ProfileModal isOpen={showProfileModal} onClose={() => setShowProfileModal(false)} userInfo={myInfo} onSave={handleSaveProfile} />
     </div>
   );
 }
 
-// --- プロフィール設定 ---
-function ProfileModal({ isOpen, onClose, currentPhotoUrl, onSave }) {
+// --- プロフィール設定モーダル ---
+function ProfileModal({ isOpen, onClose, userInfo, onSave }) {
   const [isUploading, setIsUploading] = useState(false);
+  const [goal, setGoal] = useState(userInfo?.goal || '');
+  const [theme, setTheme] = useState(userInfo?.theme || 'light');
+  const [photoUrl, setPhotoUrl] = useState(userInfo?.photoUrl || null);
+
+  useEffect(() => {
+    if (isOpen) {
+      setGoal(userInfo?.goal || '');
+      setTheme(userInfo?.theme || 'light');
+      setPhotoUrl(userInfo?.photoUrl || null);
+    }
+  }, [isOpen, userInfo]);
+
   if (!isOpen) return null;
 
   const handleFileChange = (e) => {
@@ -716,19 +758,10 @@ function ProfileModal({ isOpen, onClose, currentPhotoUrl, onSave }) {
         const MAX_SIZE = 400;
         let width = img.width;
         let height = img.height;
-
-        if (width > height) {
-          if (width > MAX_SIZE) { height *= MAX_SIZE / width; width = MAX_SIZE; }
-        } else {
-          if (height > MAX_SIZE) { width *= MAX_SIZE / height; height = MAX_SIZE; }
-        }
-
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(img, 0, 0, width, height);
-        
-        onSave(canvas.toDataURL('image/jpeg', 0.8));
+        if (width > height) { if (width > MAX_SIZE) { height *= MAX_SIZE / width; width = MAX_SIZE; } } else { if (height > MAX_SIZE) { width *= MAX_SIZE / height; height = MAX_SIZE; } }
+        canvas.width = width; canvas.height = height;
+        const ctx = canvas.getContext('2d'); ctx.drawImage(img, 0, 0, width, height);
+        setPhotoUrl(canvas.toDataURL('image/jpeg', 0.8));
         setIsUploading(false);
       };
       img.src = event.target.result;
@@ -736,37 +769,58 @@ function ProfileModal({ isOpen, onClose, currentPhotoUrl, onSave }) {
     reader.readAsDataURL(file);
   };
 
+  const handleSave = () => {
+    onSave({ photoUrl, goal: goal.trim(), theme });
+  };
+
   return (
     <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex flex-col items-center justify-center animate-in fade-in duration-200 p-4">
-      <div className="bg-white rounded-3xl w-full max-w-sm p-6 shadow-2xl">
+      <div className="bg-white dark:bg-slate-800 rounded-3xl w-full max-w-sm p-6 shadow-2xl">
         <div className="flex justify-between items-center mb-6">
-          <h2 className="text-xl font-bold text-slate-800">プロフィール画像</h2>
-          <button onClick={onClose} className="p-2 text-slate-400 hover:text-slate-600 bg-slate-100 rounded-full"><X size={20} /></button>
+          <h2 className="text-xl font-bold text-slate-800 dark:text-white">プロフィール設定</h2>
+          <button onClick={onClose} className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 bg-slate-100 dark:bg-slate-700 rounded-full"><X size={20} /></button>
         </div>
+        
         <div className="flex flex-col items-center space-y-6">
-          <div className="w-32 h-32 rounded-full bg-slate-100 border-4 border-slate-200 overflow-hidden flex items-center justify-center relative">
-            {currentPhotoUrl ? (
-              <img src={currentPhotoUrl} alt="profile" className="w-full h-full object-cover" />
-            ) : <Users size={40} className="text-slate-300" />}
-            {isUploading && <div className="absolute inset-0 bg-white/60 flex items-center justify-center"><Activity className="animate-spin text-emerald-500" size={24} /></div>}
+          <div className="w-28 h-28 rounded-full bg-slate-100 dark:bg-slate-700 border-4 border-slate-200 dark:border-slate-600 overflow-hidden flex items-center justify-center relative">
+            {photoUrl ? (
+              <img src={photoUrl} alt="profile" className="w-full h-full object-cover" />
+            ) : <Users size={40} className="text-slate-300 dark:text-slate-500" />}
+            {isUploading && <div className="absolute inset-0 bg-white/60 dark:bg-slate-900/60 flex items-center justify-center"><Activity className="animate-spin text-emerald-500" size={24} /></div>}
           </div>
-          {currentPhotoUrl ? (
-            <div className="flex gap-2 w-full">
-              <label className="flex-1 py-3 bg-emerald-50 text-emerald-600 border border-emerald-200 rounded-xl text-sm font-bold flex items-center justify-center gap-2 hover:bg-emerald-100 transition-colors cursor-pointer">
-                <PlusCircle size={18} /> 変更
-                <input type="file" accept="image/*" onChange={handleFileChange} className="hidden" disabled={isUploading} />
-              </label>
-              <button onClick={() => onSave(null)} disabled={isUploading} className="flex-1 py-3 bg-rose-50 text-rose-600 border border-rose-200 rounded-xl text-sm font-bold flex items-center justify-center gap-2 hover:bg-rose-100 transition-colors">
-                <Trash2 size={18} /> 削除
-              </button>
-            </div>
-          ) : (
-            <label className="w-full py-3 bg-emerald-50 text-emerald-600 border border-emerald-200 rounded-xl text-sm font-bold flex items-center justify-center gap-2 hover:bg-emerald-100 transition-colors cursor-pointer">
-              <PlusCircle size={18} /> 新しい画像を選択
+          
+          <div className="flex gap-2 w-full">
+            <label className="flex-1 py-2 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 rounded-xl text-sm font-bold flex items-center justify-center gap-2 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 transition-colors cursor-pointer">
+              <PlusCircle size={16} /> 画像変更
               <input type="file" accept="image/*" onChange={handleFileChange} className="hidden" disabled={isUploading} />
             </label>
-          )}
+            {photoUrl && (
+              <button onClick={() => setPhotoUrl(null)} disabled={isUploading} className="flex-1 py-2 bg-rose-50 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-800 rounded-xl text-sm font-bold flex items-center justify-center gap-2 hover:bg-rose-100 dark:hover:bg-rose-900/50 transition-colors">
+                <Trash2 size={16} /> 削除
+              </button>
+            )}
+          </div>
         </div>
+
+        <div className="mt-6 space-y-4">
+          <div>
+            <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">目標 (100文字以内)</label>
+            <textarea value={goal} maxLength={100} onChange={e => setGoal(e.target.value)} placeholder="例: ベンチプレス100kg達成！" className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl p-3 text-sm text-slate-800 dark:text-slate-100 focus:outline-none focus:border-emerald-500 resize-none" rows={3} />
+            <div className="text-right text-xs text-slate-400 mt-1">{goal.length} / 100</div>
+          </div>
+          
+          <div>
+             <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">テーマ設定</label>
+             <div className="flex bg-slate-100 dark:bg-slate-700 p-1 rounded-xl">
+               <button onClick={() => setTheme('light')} className={`flex-1 flex items-center justify-center gap-2 py-2 text-sm font-bold rounded-lg transition-colors ${theme === 'light' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-500 dark:text-slate-400'}`}><Sun size={16}/> ライト</button>
+               <button onClick={() => setTheme('dark')} className={`flex-1 flex items-center justify-center gap-2 py-2 text-sm font-bold rounded-lg transition-colors ${theme === 'dark' ? 'bg-slate-800 text-emerald-400 shadow-sm' : 'text-slate-500 dark:text-slate-400'}`}><Moon size={16}/> ダーク</button>
+             </div>
+          </div>
+        </div>
+
+        <button onClick={handleSave} className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-3 rounded-xl shadow-md transition-all mt-6">
+          設定を保存
+        </button>
       </div>
     </div>
   );
@@ -902,17 +956,27 @@ function LoginScreen({ onLogin, accountsInfo, onChangePin, isOnline }) {
 }
 
 // --- タイムライン画面 ---
-function TimelineView({ posts, onToggleLike, currentUser, onDelete, onEdit, accountsInfo }) {
+function TimelineView({ posts, onToggleLike, onImport, currentUser, onDelete, onEdit, accountsInfo }) {
+  const [displayLimit, setDisplayLimit] = useState(10);
+  const displayedPosts = posts.slice(0, displayLimit);
+
   return (
     <div className="space-y-4">
-      <h2 className="text-xl font-bold text-slate-900 mb-6">アクティビティ</h2>
+      <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-6">アクティビティ</h2>
       {!posts || posts.length === 0 ? (
-        <div className="bg-white border border-slate-200 rounded-2xl p-8 text-center mt-10 shadow-sm">
-          <Dumbbell className="mx-auto text-slate-300 w-12 h-12 mb-4" />
-          <p className="text-slate-500 font-bold">まだ記録がありません。<br/>最初のトレーニングを記録しましょう！</p>
+        <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-8 text-center mt-10 shadow-sm">
+          <Dumbbell className="mx-auto text-slate-300 dark:text-slate-600 w-12 h-12 mb-4" />
+          <p className="text-slate-500 dark:text-slate-400 font-bold">まだ記録がありません。<br/>最初のトレーニングを記録しましょう！</p>
         </div>
       ) : (
-        posts.map(post => <WorkoutCard key={post.id} post={post} currentUser={currentUser} accountsInfo={accountsInfo} onEdit={onEdit} onDelete={onDelete} onToggleLike={onToggleLike} />)
+        <>
+          {displayedPosts.map(post => <WorkoutCard key={post.id} post={post} currentUser={currentUser} accountsInfo={accountsInfo} onEdit={onEdit} onDelete={onDelete} onToggleLike={onToggleLike} onImport={onImport} />)}
+          {posts.length > displayLimit && (
+            <button onClick={() => setDisplayLimit(prev => prev + 10)} className="w-full py-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 font-bold rounded-xl shadow-sm hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors mt-4">
+              もっと見る
+            </button>
+          )}
+        </>
       )}
     </div>
   );
@@ -928,6 +992,7 @@ function DataView({ posts, currentUser, accountsInfo, onEdit, onDelete }) {
   const month = currentMonth.getMonth();
   const firstDay = new Date(year, month, 1).getDay();
   const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const todayStr = formatDateFromTimestamp(Date.now());
   
   const blanks = Array.from({ length: firstDay || 0 }).map((_, i) => <div key={`blank-${i}`} className="p-2"></div>);
   const days = Array.from({ length: daysInMonth || 0 }).map((_, i) => {
@@ -935,10 +1000,15 @@ function DataView({ posts, currentUser, accountsInfo, onEdit, onDelete }) {
     const dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(date).padStart(2,'0')}`;
     const isTrained = myPosts.some(p => formatDateFromTimestamp(p.timestamp) === dateStr);
     const isSelected = selectedDateStr === dateStr;
+    const isToday = dateStr === todayStr;
     
     return (
       <div key={`day-${date}`} className="p-1 flex justify-center items-center" onClick={() => setSelectedDateStr(dateStr)}>
-        <div className={`w-8 h-8 flex items-center justify-center rounded-full text-sm font-bold transition-all cursor-pointer ${isSelected ? 'ring-2 ring-offset-1 ring-emerald-500' : ''} ${isTrained ? 'bg-emerald-500 text-white shadow-md' : 'text-slate-600 hover:bg-slate-100'}`}>
+        <div className={`w-8 h-8 flex items-center justify-center rounded-full text-sm font-bold transition-all cursor-pointer 
+          ${isSelected ? 'ring-2 ring-offset-1 ring-emerald-500 dark:ring-offset-slate-800' : ''} 
+          ${isTrained ? 'bg-emerald-500 text-white shadow-md' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'}
+          ${isToday && !isTrained ? 'border-2 border-rose-400 text-rose-500' : ''}
+        `}>
           {date}
         </div>
       </div>
@@ -952,12 +1022,12 @@ function DataView({ posts, currentUser, accountsInfo, onEdit, onDelete }) {
 
   return (
     <div className="space-y-6">
-      <h2 className="text-xl font-bold text-slate-900 mb-6">データ</h2>
+      <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-6">データ</h2>
       
-      <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+      <div className="bg-white dark:bg-slate-800 p-5 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm">
         <div className="flex justify-between items-center mb-4">
           <button onClick={() => setCurrentMonth(new Date(year, month - 1, 1))} className="text-slate-400 hover:text-emerald-500 font-bold p-2 transition-colors">&lt;</button>
-          <span className="font-bold text-slate-700">{year}年 {month + 1}月</span>
+          <span className="font-bold text-slate-700 dark:text-slate-200">{year}年 {month + 1}月</span>
           <button onClick={() => setCurrentMonth(new Date(year, month + 1, 1))} className="text-slate-400 hover:text-emerald-500 font-bold p-2 transition-colors">&gt;</button>
         </div>
         <div className="grid grid-cols-7 text-center mb-2">
@@ -968,11 +1038,11 @@ function DataView({ posts, currentUser, accountsInfo, onEdit, onDelete }) {
       
       {selectedDateStr && (
         <div className="pt-2 animate-in fade-in">
-          <h3 className="text-sm font-bold text-slate-500 mb-4">{selectedDateStr} の記録</h3>
+          <h3 className="text-sm font-bold text-slate-500 dark:text-slate-400 mb-4">{selectedDateStr.replace(/-/g, '/')} の記録</h3>
           {selectedPosts.length > 0 ? (
             selectedPosts.map(post => <WorkoutCard key={post.id} post={post} currentUser={currentUser} accountsInfo={accountsInfo} onEdit={onEdit} onDelete={onDelete} />)
           ) : (
-             <div className="bg-slate-100 p-4 rounded-xl text-center text-slate-400 text-sm font-bold">記録はありません</div>
+             <div className="bg-slate-100 dark:bg-slate-800 p-4 rounded-xl text-center text-slate-400 dark:text-slate-500 text-sm font-bold border border-slate-200 dark:border-slate-700">記録はありません</div>
           )}
         </div>
       )}
@@ -990,6 +1060,8 @@ function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workou
   const [selectedCategories, setSelectedCategories] = useState([]);
   const [bodyWeight, setBodyWeight] = useState('');
   const [bodyFat, setBodyFat] = useState('');
+
+  const [draggedIndex, setDraggedIndex] = useState(null);
 
   const isTraining = myInfo.isTraining;
   
@@ -1052,7 +1124,6 @@ function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workou
       })};
     }));
   }
-
   const removeDropSet = (itemId, parentSetId, dropId) => {
     setWorkoutItems(prev => prev.map(item => {
       if (item.id !== itemId) return item;
@@ -1062,7 +1133,6 @@ function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workou
       })};
     }));
   }
-
   const updateDropSetField = (itemId, parentSetId, dropId, field, value) => {
     setWorkoutItems(prev => prev.map(item => {
       if (item.id !== itemId) return item;
@@ -1072,6 +1142,28 @@ function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workou
       })};
     }));
   }
+
+  const handleDragStart = (e, index) => {
+    setDraggedIndex(index);
+    e.dataTransfer.effectAllowed = 'move';
+    // Firefox対応のためのダミーデータ
+    if (e.dataTransfer.setData) e.dataTransfer.setData('text/plain', '');
+  };
+
+  const handleDragOver = (e, index) => {
+    e.preventDefault();
+    if (draggedIndex === null || draggedIndex === index) return;
+    const newItems = [...workoutItems];
+    const draggedItem = newItems[draggedIndex];
+    newItems.splice(draggedIndex, 1);
+    newItems.splice(index, 0, draggedItem);
+    setWorkoutItems(newItems);
+    setDraggedIndex(index);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedIndex(null);
+  };
 
   const handleSubmit = async () => {
     const isValid = workoutItems.every(item => {
@@ -1091,12 +1183,12 @@ function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workou
   if (!isTraining) {
     return (
       <div className="space-y-6 animate-in fade-in duration-300">
-        <h2 className="text-xl font-bold text-slate-900 mb-2">ワークアウトを開始</h2>
-        <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm flex flex-col items-center">
-          <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mb-4"><MapPin size={28} className="text-slate-400" /></div>
-          <label className="block text-sm font-bold text-slate-700 mb-3 text-center">本日のトレーニング場所を選択してください</label>
+        <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-2">ワークアウトを開始</h2>
+        <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-6 shadow-sm flex flex-col items-center">
+          <div className="w-16 h-16 bg-slate-50 dark:bg-slate-700 rounded-full flex items-center justify-center mb-4"><MapPin size={28} className="text-slate-400 dark:text-slate-500" /></div>
+          <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-3 text-center">本日のトレーニング場所を選択してください</label>
           <div className="w-full relative mb-6">
-            <select value={selectedGymId} onChange={(e) => setSelectedGymId(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-800 font-bold appearance-none focus:outline-none focus:border-emerald-500 text-base" style={{ fontSize: '16px' }}>
+            <select value={selectedGymId} onChange={(e) => setSelectedGymId(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-xl px-4 py-3 text-slate-800 dark:text-slate-100 font-bold appearance-none focus:outline-none focus:border-emerald-500 text-base" style={{ fontSize: '16px' }}>
               <option value="" disabled>ジムを選択</option>
               {gyms.filter(g => g.id !== 'common').map(gym => <option key={gym.id} value={gym.id}>{gym.name}</option>)}
             </select>
@@ -1120,46 +1212,62 @@ function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workou
         </div>
       </div>
 
-      <h2 className="text-lg font-bold text-slate-900 mt-6 mb-2">ワークアウト中</h2>
+      <h2 className="text-lg font-bold text-slate-900 dark:text-white mt-6 mb-2">ワークアウト中</h2>
 
       <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
         {MUSCLE_CATEGORIES.map(cat => {
           const isSelected = selectedCategories.includes(cat);
-          return <button key={cat} onClick={() => toggleCategory(cat)} className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-bold transition-all border ${isSelected ? 'bg-emerald-500 text-white border-emerald-500 shadow-sm' : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'}`}>{cat}</button>;
+          return <button key={cat} onClick={() => toggleCategory(cat)} className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-bold transition-all border ${isSelected ? 'bg-emerald-500 text-white border-emerald-500 shadow-sm' : 'bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700'}`}>{cat}</button>;
         })}
       </div>
 
       {availableExercises.length === 0 ? (
-        <div className="bg-white border border-slate-200 rounded-2xl p-6 text-center shadow-sm">
-          <p className="text-slate-500 mb-2 text-sm font-bold">該当する種目がありません。</p><p className="text-slate-400 text-xs font-bold">「種目」タブから追加してください。</p>
+        <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-6 text-center shadow-sm">
+          <p className="text-slate-500 dark:text-slate-400 mb-2 text-sm font-bold">該当する種目がありません。</p><p className="text-slate-400 dark:text-slate-500 text-xs font-bold">「種目」タブから追加してください。</p>
         </div>
       ) : (
-        <div className="space-y-6">
-          {workoutItems.map((item) => (
-             <WorkoutItemForm key={item.id} item={item} availableExercises={availableExercises} updateItem={updateItem} removeItem={removeExerciseItem} addSet={addSet} removeSet={removeSet} updateSet={updateSetField} addDropSet={addDropSet} removeDropSet={removeDropSet} updateDropSet={updateDropSetField} />
+        <div className="space-y-4">
+          {workoutItems.map((item, index) => (
+             <WorkoutItemForm 
+               key={item.id} 
+               item={item} 
+               index={index}
+               availableExercises={availableExercises} 
+               updateItem={updateItem} 
+               removeItem={removeExerciseItem} 
+               addSet={addSet} 
+               removeSet={removeSet} 
+               updateSet={updateSetField} 
+               addDropSet={addDropSet} 
+               removeDropSet={removeDropSet} 
+               updateDropSet={updateDropSetField}
+               onDragStart={handleDragStart}
+               onDragOver={handleDragOver}
+               onDragEnd={handleDragEnd}
+             />
           ))}
 
-          <button onClick={() => addExerciseItem()} className="w-full py-3 bg-slate-100 text-slate-700 rounded-xl text-sm font-bold flex items-center justify-center gap-2 hover:bg-slate-200 transition-colors border border-slate-200"><ListPlus size={18} /> 次の種目を追加</button>
+          <button onClick={() => addExerciseItem()} className="w-full py-4 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-xl text-sm font-bold flex items-center justify-center gap-2 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors border border-slate-200 dark:border-slate-700"><ListPlus size={18} /> 次の種目を追加</button>
 
-          <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm mt-6">
-            <h3 className="text-sm font-bold text-slate-700 mb-3 flex items-center gap-2"><Activity size={16} /> 本日の体組成（任意）</h3>
+          <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-4 shadow-sm mt-6">
+            <h3 className="text-sm font-bold text-slate-700 dark:text-slate-300 mb-3 flex items-center gap-2"><Activity size={16} /> 本日の体組成（任意）</h3>
             <div className="flex gap-4">
               <div className="flex-1 relative">
-                <input type="number" step="0.1" value={bodyWeight} onChange={(e) => setBodyWeight(e.target.value)} placeholder="体重" className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 px-3 text-slate-800 font-bold focus:outline-none focus:border-emerald-500" style={{ fontSize: '16px' }}/>
+                <input type="number" step="0.1" value={bodyWeight} onChange={(e) => setBodyWeight(e.target.value)} placeholder="体重" className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl py-2 px-3 text-slate-800 dark:text-slate-100 font-bold focus:outline-none focus:border-emerald-500" style={{ fontSize: '16px' }}/>
                 <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">kg</span>
               </div>
               <div className="flex-1 relative">
-                <input type="number" step="0.1" value={bodyFat} onChange={(e) => setBodyFat(e.target.value)} placeholder="体脂肪率" className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 px-3 text-slate-800 font-bold focus:outline-none focus:border-emerald-500" style={{ fontSize: '16px' }}/>
+                <input type="number" step="0.1" value={bodyFat} onChange={(e) => setBodyFat(e.target.value)} placeholder="体脂肪率" className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl py-2 px-3 text-slate-800 dark:text-slate-100 font-bold focus:outline-none focus:border-emerald-500" style={{ fontSize: '16px' }}/>
                 <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">%</span>
               </div>
             </div>
           </div>
 
-          <button onClick={handleSubmit} disabled={isSubmitting || workoutItems.length === 0} className={`w-full text-white font-bold py-4 rounded-xl shadow-md flex items-center justify-center gap-2 mt-6 mb-8 transition-all ${isSubmitting || workoutItems.length === 0 ? 'bg-slate-300 cursor-not-allowed text-slate-500' : 'bg-emerald-500 hover:bg-emerald-600 shadow-emerald-500/30'}`}>
+          <button onClick={handleSubmit} disabled={isSubmitting || workoutItems.length === 0} className={`w-full text-white font-bold py-4 rounded-xl shadow-md flex items-center justify-center gap-2 mt-6 mb-8 transition-all ${isSubmitting || workoutItems.length === 0 ? 'bg-slate-300 dark:bg-slate-700 cursor-not-allowed text-slate-500 dark:text-slate-400' : 'bg-emerald-500 hover:bg-emerald-600 shadow-emerald-500/30'}`}>
             {isSubmitting ? <Activity className="animate-spin" size={20} /> : <><Flame size={20} /> トレーニングを完了して保存</>}
           </button>
           
-          <button onClick={onCancel} className="w-full text-slate-500 font-bold py-3 rounded-xl flex items-center justify-center gap-2 mt-2 mb-8 transition-all bg-white border border-slate-200 hover:bg-rose-50 hover:text-rose-500 hover:border-rose-200">記録を破棄して終了</button>
+          <button onClick={onCancel} className="w-full text-slate-500 dark:text-slate-400 font-bold py-3 rounded-xl flex items-center justify-center gap-2 mt-2 mb-8 transition-all bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-rose-50 dark:hover:bg-rose-900/30 hover:text-rose-500 hover:border-rose-200 dark:hover:border-rose-800">記録を破棄して終了</button>
         </div>
       )}
     </div>
@@ -1176,6 +1284,7 @@ function EditWorkoutModal({ post, gyms, exercises, onClose, onSave }) {
   const [editEndTime, setEditEndTime] = useState(formatTimeFromTimestamp(post.endTime || post.timestamp));
   const [editBodyWeight, setEditBodyWeight] = useState(post.bodyWeight || '');
   const [editBodyFat, setEditBodyFat] = useState(post.bodyFat || '');
+  const [draggedIndex, setDraggedIndex] = useState(null);
 
   const availableExercises = exercises.filter(ex => {
     const gym = gyms.find(g => g.name === post.gymName);
@@ -1196,6 +1305,10 @@ function EditWorkoutModal({ post, gyms, exercises, onClose, onSave }) {
   const addDropSet = (itemId, parentSetId) => { setWorkoutItems(prev => prev.map(item => { if (item.id !== itemId) return item; return { ...item, sets: item.sets.map(set => { if (set.id !== parentSetId) return set; return { ...set, dropSets: [...(set.dropSets || []), { id: generateId(), weight: '', reps: '', lReps: '', rReps: '' }]}; })}; })); }
   const removeDropSet = (itemId, parentSetId, dropId) => { setWorkoutItems(prev => prev.map(item => { if (item.id !== itemId) return item; return { ...item, sets: item.sets.map(set => { if (set.id !== parentSetId) return set; return { ...set, dropSets: set.dropSets.filter(ds => ds.id !== dropId) }; })}; })); }
   const updateDropSetField = (itemId, parentSetId, dropId, field, value) => { setWorkoutItems(prev => prev.map(item => { if (item.id !== itemId) return item; return { ...item, sets: item.sets.map(set => { if (set.id !== parentSetId) return set; return { ...set, dropSets: set.dropSets.map(ds => ds.id === dropId ? { ...ds, [field]: value } : ds) }; })}; })); }
+
+  const handleDragStart = (e, index) => { setDraggedIndex(index); e.dataTransfer.effectAllowed = 'move'; if(e.dataTransfer.setData) e.dataTransfer.setData('text/plain', ''); };
+  const handleDragOver = (e, index) => { e.preventDefault(); if (draggedIndex === null || draggedIndex === index) return; const newItems = [...workoutItems]; const draggedItem = newItems[draggedIndex]; newItems.splice(draggedIndex, 1); newItems.splice(index, 0, draggedItem); setWorkoutItems(newItems); setDraggedIndex(index); };
+  const handleDragEnd = () => setDraggedIndex(null);
 
   const handleSave = () => {
     const isValid = workoutItems.every(item => {
@@ -1223,39 +1336,55 @@ function EditWorkoutModal({ post, gyms, exercises, onClose, onSave }) {
 
   return (
     <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex flex-col justify-end animate-in fade-in duration-200">
-      <div className="bg-slate-50 rounded-t-3xl flex flex-col h-[90vh] overflow-hidden shadow-2xl">
-        <div className="flex justify-between items-center p-4 border-b border-slate-200 bg-white pt-safe sticky top-0 z-10">
-          <h2 className="text-lg font-bold text-slate-800">記録の編集</h2>
-          <button onClick={onClose} className="p-2 text-slate-400 hover:text-slate-600 bg-slate-100 rounded-full"><X size={20} /></button>
+      <div className="bg-slate-50 dark:bg-slate-900 rounded-t-3xl flex flex-col h-[90vh] overflow-hidden shadow-2xl">
+        <div className="flex justify-between items-center p-4 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800 pt-safe sticky top-0 z-10">
+          <h2 className="text-lg font-bold text-slate-800 dark:text-white">記録の編集</h2>
+          <button onClick={onClose} className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 bg-slate-100 dark:bg-slate-700 rounded-full"><X size={20} /></button>
         </div>
         
         <div className="flex-1 overflow-y-auto p-4 space-y-6 pb-24">
-          <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm mb-6 space-y-4">
-            <h3 className="text-sm font-bold text-slate-700 flex items-center gap-2"><Settings size={16} className="text-slate-400" /> トレーニング情報</h3>
-            <div className="grid grid-cols-2 gap-4">
+          <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-4 shadow-sm mb-6 space-y-4">
+            <h3 className="text-sm font-bold text-slate-700 dark:text-slate-300 flex items-center gap-2"><Settings size={16} className="text-slate-400" /> トレーニング情報</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-bold text-slate-500 mb-1">日付</label>
-                <input type="date" value={editDate} onChange={e => setEditDate(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm font-bold text-slate-700 focus:outline-none focus:border-emerald-500" />
+                <input type="date" value={editDate} onChange={e => setEditDate(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm font-bold text-slate-700 dark:text-slate-100 focus:outline-none focus:border-emerald-500" />
               </div>
               <div className="flex gap-2">
-                <div className="flex-1"><label className="block text-xs font-bold text-slate-500 mb-1">開始</label><input type="time" value={editStartTime} onChange={e => setEditStartTime(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-lg px-2 py-2 text-sm font-bold text-slate-700 focus:outline-none focus:border-emerald-500" /></div>
-                <div className="flex-1"><label className="block text-xs font-bold text-slate-500 mb-1">終了</label><input type="time" value={editEndTime} onChange={e => setEditEndTime(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-lg px-2 py-2 text-sm font-bold text-slate-700 focus:outline-none focus:border-emerald-500" /></div>
+                <div className="flex-1"><label className="block text-xs font-bold text-slate-500 mb-1">開始</label><input type="time" value={editStartTime} onChange={e => setEditStartTime(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-2 py-2 text-sm font-bold text-slate-700 dark:text-slate-100 focus:outline-none focus:border-emerald-500" /></div>
+                <div className="flex-1"><label className="block text-xs font-bold text-slate-500 mb-1">終了</label><input type="time" value={editEndTime} onChange={e => setEditEndTime(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-2 py-2 text-sm font-bold text-slate-700 dark:text-slate-100 focus:outline-none focus:border-emerald-500" /></div>
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
-              <div><label className="block text-xs font-bold text-slate-500 mb-1">体重 (kg)</label><input type="number" step="0.1" value={editBodyWeight} onChange={e => setEditBodyWeight(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm font-bold text-slate-700 focus:outline-none focus:border-emerald-500" /></div>
-              <div><label className="block text-xs font-bold text-slate-500 mb-1">体脂肪率 (%)</label><input type="number" step="0.1" value={editBodyFat} onChange={e => setEditBodyFat(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm font-bold text-slate-700 focus:outline-none focus:border-emerald-500" /></div>
+              <div><label className="block text-xs font-bold text-slate-500 mb-1">体重 (kg)</label><input type="number" step="0.1" value={editBodyWeight} onChange={e => setEditBodyWeight(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm font-bold text-slate-700 dark:text-slate-100 focus:outline-none focus:border-emerald-500" /></div>
+              <div><label className="block text-xs font-bold text-slate-500 mb-1">体脂肪率 (%)</label><input type="number" step="0.1" value={editBodyFat} onChange={e => setEditBodyFat(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm font-bold text-slate-700 dark:text-slate-100 focus:outline-none focus:border-emerald-500" /></div>
             </div>
           </div>
 
-          {workoutItems.map((item) => (
-             <WorkoutItemForm key={item.id} item={item} availableExercises={availableExercises} updateItem={updateItem} removeItem={removeExerciseItem} addSet={addSet} removeSet={removeSet} updateSet={updateSetField} addDropSet={addDropSet} removeDropSet={removeDropSet} updateDropSet={updateDropSetField} />
+          {workoutItems.map((item, index) => (
+             <WorkoutItemForm 
+               key={item.id} 
+               item={item} 
+               index={index}
+               availableExercises={availableExercises} 
+               updateItem={updateItem} 
+               removeItem={removeExerciseItem} 
+               addSet={addSet} 
+               removeSet={removeSet} 
+               updateSet={updateSetField} 
+               addDropSet={addDropSet} 
+               removeDropSet={removeDropSet} 
+               updateDropSet={updateDropSetField}
+               onDragStart={handleDragStart}
+               onDragOver={handleDragOver}
+               onDragEnd={handleDragEnd}
+             />
           ))}
 
-          <button onClick={addExerciseItem} className="w-full py-3 bg-slate-100 text-slate-700 rounded-xl text-sm font-bold flex items-center justify-center gap-2 hover:bg-slate-200 transition-colors border border-slate-200"><ListPlus size={18} /> 次の種目を追加</button>
+          <button onClick={addExerciseItem} className="w-full py-4 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-xl text-sm font-bold flex items-center justify-center gap-2 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors border border-slate-200 dark:border-slate-700"><ListPlus size={18} /> 次の種目を追加</button>
         </div>
 
-        <div className="p-4 bg-white border-t border-slate-200 pb-safe">
+        <div className="p-4 bg-white dark:bg-slate-800 border-t border-slate-200 dark:border-slate-700 pb-safe">
           <button onClick={handleSave} className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-4 rounded-xl shadow-md transition-all shadow-emerald-500/30">
             変更を保存
           </button>
@@ -1318,29 +1447,29 @@ function ExercisesView({ gyms, exercises }) {
 
   return (
     <div className="space-y-6">
-      <h2 className="text-xl font-bold text-slate-900 mb-6">種目とジムの管理</h2>
+      <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-6">種目とジムの管理</h2>
       
-      <div className="flex bg-slate-200 p-1 rounded-xl mb-6">
-        <button onClick={() => setActiveTab('exercises')} className={`flex-1 py-2 text-sm font-bold text-center rounded-lg transition-colors ${activeTab === 'exercises' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-500'}`}>種目リスト</button>
-        <button onClick={() => setActiveTab('gyms')} className={`flex-1 py-2 text-sm font-bold text-center rounded-lg transition-colors ${activeTab === 'gyms' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-500'}`}>ジムの登録</button>
+      <div className="flex bg-slate-200 dark:bg-slate-800 p-1 rounded-xl mb-6">
+        <button onClick={() => setActiveTab('exercises')} className={`flex-1 py-2 text-sm font-bold text-center rounded-lg transition-colors ${activeTab === 'exercises' ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-slate-500 dark:text-slate-400'}`}>種目リスト</button>
+        <button onClick={() => setActiveTab('gyms')} className={`flex-1 py-2 text-sm font-bold text-center rounded-lg transition-colors ${activeTab === 'gyms' ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-slate-500 dark:text-slate-400'}`}>ジムの登録</button>
       </div>
 
       {activeTab === 'gyms' && (
         <div className="space-y-6 animate-in fade-in">
-          <form onSubmit={handleAddGym} className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
-            <h3 className="text-sm font-bold text-slate-700 mb-3">新しいジムを登録</h3>
+          <form onSubmit={handleAddGym} className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-4 shadow-sm">
+            <h3 className="text-sm font-bold text-slate-700 dark:text-slate-300 mb-3">新しいジムを登録</h3>
             <div className="flex gap-2">
-              <input type="text" value={newGymName} onChange={e => setNewGymName(e.target.value)} required placeholder="例: エニタイム新宿" className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-800 focus:border-emerald-500 focus:outline-none text-base" style={{ fontSize: '16px' }}/>
+              <input type="text" value={newGymName} onChange={e => setNewGymName(e.target.value)} required placeholder="例: エニタイム新宿" className="flex-1 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-slate-800 dark:text-slate-100 focus:border-emerald-500 focus:outline-none text-base" style={{ fontSize: '16px' }}/>
               <button type="submit" disabled={isAdding || !newGymName.trim()} className="bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-bold px-4 rounded-xl transition-colors disabled:opacity-50">追加</button>
             </div>
           </form>
           <div>
-            <h3 className="text-sm font-bold text-slate-500 mb-3 ml-1">登録済みのジム</h3>
+            <h3 className="text-sm font-bold text-slate-500 dark:text-slate-400 mb-3 ml-1">登録済みのジム</h3>
             <div className="space-y-2">
               {gyms.filter(g => g.id !== 'common').map(gym => (
-                <div key={gym.id} className="bg-white border border-slate-200 rounded-xl p-3 flex justify-between items-center shadow-sm">
-                  <span className="font-bold text-slate-700 text-sm">{gym.name}</span>
-                  <button onClick={() => { if(window.confirm(`${gym.name}を削除しますか？`)) handleDelete('gyms', gym.id); }} className="p-2 text-slate-400 hover:text-rose-500 bg-slate-50 rounded-lg"><Trash2 size={16} /></button>
+                <div key={gym.id} className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-3 flex justify-between items-center shadow-sm">
+                  <span className="font-bold text-slate-700 dark:text-slate-200 text-sm">{gym.name}</span>
+                  <button onClick={() => { if(window.confirm(`${gym.name}を削除しますか？`)) handleDelete('gyms', gym.id); }} className="p-2 text-slate-400 hover:text-rose-500 bg-slate-50 dark:bg-slate-700 rounded-lg"><Trash2 size={16} /></button>
                 </div>
               ))}
             </div>
@@ -1351,68 +1480,68 @@ function ExercisesView({ gyms, exercises }) {
       {activeTab === 'exercises' && (
         <div className="space-y-6 animate-in fade-in">
           {gyms.length === 0 ? (
-            <div className="text-center py-8"><p className="text-slate-500 text-sm mb-4 font-bold">先に「ジムの登録」タブでジムを追加してください。</p></div>
+            <div className="text-center py-8"><p className="text-slate-500 dark:text-slate-400 text-sm mb-4 font-bold">先に「ジムの登録」タブでジムを追加してください。</p></div>
           ) : (
             <>
               {editingExId ? (
-                <form onSubmit={handleUpdateExercise} className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 shadow-sm relative animate-in slide-in-from-top-4">
-                  <h3 className="text-sm font-bold text-emerald-700 mb-3 flex items-center gap-2"><Edit2 size={16}/> 種目の編集</h3>
-                  <button type="button" onClick={cancelEdit} className="absolute top-4 right-4 text-slate-400 hover:text-slate-600"><X size={20}/></button>
+                <form onSubmit={handleUpdateExercise} className="bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-2xl p-4 shadow-sm relative animate-in slide-in-from-top-4">
+                  <h3 className="text-sm font-bold text-emerald-700 dark:text-emerald-400 mb-3 flex items-center gap-2"><Edit2 size={16}/> 種目の編集</h3>
+                  <button type="button" onClick={cancelEdit} className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"><X size={20}/></button>
                   <div className="space-y-3">
                     <div>
-                      <label className="block text-xs font-bold text-slate-500 mb-1">部位カテゴリ</label>
+                      <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">部位カテゴリ</label>
                       <div className="relative">
-                        <select value={editExCategory} onChange={e => setEditExCategory(e.target.value)} className="w-full bg-white border border-emerald-200 rounded-xl px-3 py-2.5 text-slate-800 font-bold appearance-none focus:outline-none focus:border-emerald-500 text-base" style={{ fontSize: '16px' }}>
+                        <select value={editExCategory} onChange={e => setEditExCategory(e.target.value)} className="w-full bg-white dark:bg-slate-800 border border-emerald-200 dark:border-emerald-800 rounded-xl px-3 py-2.5 text-slate-800 dark:text-slate-100 font-bold appearance-none focus:outline-none focus:border-emerald-500 text-base" style={{ fontSize: '16px' }}>
                           {MUSCLE_CATEGORIES.map(cat => <option key={cat} value={cat}>{cat}</option>)}
                         </select>
                         <div className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none text-xs">▼</div>
                       </div>
                     </div>
-                    <div><label className="block text-xs font-bold text-slate-500 mb-1">種目名 <span className="text-rose-500">*</span></label><input type="text" value={editExName} onChange={e => setEditExName(e.target.value)} required className="w-full bg-white border border-emerald-200 rounded-xl px-3 py-2 text-slate-800 focus:border-emerald-500 focus:outline-none text-base" style={{ fontSize: '16px' }}/></div>
-                    <div><label className="block text-xs font-bold text-slate-500 mb-1">メーカー (任意)</label><input type="text" value={editExMaker} onChange={e => setEditExMaker(e.target.value)} className="w-full bg-white border border-emerald-200 rounded-xl px-3 py-2 text-slate-800 focus:border-emerald-500 focus:outline-none text-base" style={{ fontSize: '16px' }}/></div>
+                    <div><label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">種目名 <span className="text-rose-500">*</span></label><input type="text" value={editExName} onChange={e => setEditExName(e.target.value)} required className="w-full bg-white dark:bg-slate-800 border border-emerald-200 dark:border-emerald-800 rounded-xl px-3 py-2 text-slate-800 dark:text-slate-100 focus:border-emerald-500 focus:outline-none text-base" style={{ fontSize: '16px' }}/></div>
+                    <div><label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">メーカー (任意)</label><input type="text" value={editExMaker} onChange={e => setEditExMaker(e.target.value)} className="w-full bg-white dark:bg-slate-800 border border-emerald-200 dark:border-emerald-800 rounded-xl px-3 py-2 text-slate-800 dark:text-slate-100 focus:border-emerald-500 focus:outline-none text-base" style={{ fontSize: '16px' }}/></div>
                     <div>
-                       <label className="block text-xs font-bold text-slate-500 mb-1">重さの単位/記録方法 <span className="text-rose-500">*</span></label>
+                       <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">重さの単位/記録方法 <span className="text-rose-500">*</span></label>
                        <div className="grid grid-cols-2 gap-2">
-                          <label className={`text-center py-2 rounded-lg text-sm font-bold border cursor-pointer ${editExWeightType === 'total' ? 'bg-emerald-500 text-white border-emerald-600' : 'bg-white border-emerald-200 text-slate-600'}`}><input type="radio" value="total" checked={editExWeightType === 'total'} onChange={(e) => setEditExWeightType(e.target.value)} className="hidden"/>合計 (kg)</label>
-                          <label className={`text-center py-2 rounded-lg text-sm font-bold border cursor-pointer ${editExWeightType === 'oneSide' ? 'bg-emerald-500 text-white border-emerald-600' : 'bg-white border-emerald-200 text-slate-600'}`}><input type="radio" value="oneSide" checked={editExWeightType === 'oneSide'} onChange={(e) => setEditExWeightType(e.target.value)} className="hidden"/>片側 (kg)</label>
-                          <label className={`text-center py-2 rounded-lg text-sm font-bold border cursor-pointer ${editExWeightType === 'plate' ? 'bg-emerald-500 text-white border-emerald-600' : 'bg-white border-emerald-200 text-slate-600'}`}><input type="radio" value="plate" checked={editExWeightType === 'plate'} onChange={(e) => setEditExWeightType(e.target.value)} className="hidden"/>プレート (枚)</label>
-                          <label className={`text-center py-2 rounded-lg text-sm font-bold border cursor-pointer ${editExWeightType === 'lr' ? 'bg-emerald-500 text-white border-emerald-600' : 'bg-white border-emerald-200 text-slate-600'}`}><input type="radio" value="lr" checked={editExWeightType === 'lr'} onChange={(e) => setEditExWeightType(e.target.value)} className="hidden"/>片側種目 (左右別)</label>
+                          <label className={`text-center py-2 rounded-lg text-sm font-bold border cursor-pointer ${editExWeightType === 'total' ? 'bg-emerald-500 text-white border-emerald-600' : 'bg-white dark:bg-slate-800 border-emerald-200 dark:border-emerald-800 text-slate-600 dark:text-slate-300'}`}><input type="radio" value="total" checked={editExWeightType === 'total'} onChange={(e) => setEditExWeightType(e.target.value)} className="hidden"/>合計 (kg)</label>
+                          <label className={`text-center py-2 rounded-lg text-sm font-bold border cursor-pointer ${editExWeightType === 'oneSide' ? 'bg-emerald-500 text-white border-emerald-600' : 'bg-white dark:bg-slate-800 border-emerald-200 dark:border-emerald-800 text-slate-600 dark:text-slate-300'}`}><input type="radio" value="oneSide" checked={editExWeightType === 'oneSide'} onChange={(e) => setEditExWeightType(e.target.value)} className="hidden"/>片側 (kg)</label>
+                          <label className={`text-center py-2 rounded-lg text-sm font-bold border cursor-pointer ${editExWeightType === 'plate' ? 'bg-emerald-500 text-white border-emerald-600' : 'bg-white dark:bg-slate-800 border-emerald-200 dark:border-emerald-800 text-slate-600 dark:text-slate-300'}`}><input type="radio" value="plate" checked={editExWeightType === 'plate'} onChange={(e) => setEditExWeightType(e.target.value)} className="hidden"/>プレート (枚)</label>
+                          <label className={`text-center py-2 rounded-lg text-sm font-bold border cursor-pointer ${editExWeightType === 'lr' ? 'bg-emerald-500 text-white border-emerald-600' : 'bg-white dark:bg-slate-800 border-emerald-200 dark:border-emerald-800 text-slate-600 dark:text-slate-300'}`}><input type="radio" value="lr" checked={editExWeightType === 'lr'} onChange={(e) => setEditExWeightType(e.target.value)} className="hidden"/>片側種目 (左右別)</label>
                        </div>
                     </div>
                     <button type="submit" disabled={!editExName.trim()} className="w-full bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold py-3 rounded-xl mt-2 transition-colors disabled:opacity-50 shadow-md">更新して保存</button>
                   </div>
                 </form>
               ) : (
-                <form onSubmit={handleAddExercise} className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
-                  <h3 className="text-sm font-bold text-slate-700 mb-3">新しい種目を登録</h3>
+                <form onSubmit={handleAddExercise} className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-4 shadow-sm">
+                  <h3 className="text-sm font-bold text-slate-700 dark:text-slate-300 mb-3">新しい種目を登録</h3>
                   <div className="space-y-3">
                     <div>
-                      <label className="block text-xs font-bold text-slate-500 mb-1">対象のジム <span className="text-rose-500">*</span></label>
+                      <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">対象のジム <span className="text-rose-500">*</span></label>
                       <div className="relative">
-                        <select value={selectedGymId} onChange={e => setSelectedGymId(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-slate-800 font-bold appearance-none focus:outline-none focus:border-emerald-500 text-base" style={{ fontSize: '16px' }}>
+                        <select value={selectedGymId} onChange={e => setSelectedGymId(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2.5 text-slate-800 dark:text-slate-100 font-bold appearance-none focus:outline-none focus:border-emerald-500 text-base" style={{ fontSize: '16px' }}>
                           {gyms.map(gym => <option key={gym.id} value={gym.id}>{gym.name}</option>)}
                         </select>
                         <div className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none text-xs">▼</div>
                       </div>
                     </div>
                     <div>
-                      <label className="block text-xs font-bold text-slate-500 mb-1">部位カテゴリ <span className="text-rose-500">*</span></label>
+                      <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">部位カテゴリ <span className="text-rose-500">*</span></label>
                       <div className="relative">
-                        <select value={newExCategory} onChange={e => setNewExCategory(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-slate-800 font-bold appearance-none focus:outline-none focus:border-emerald-500 text-base" style={{ fontSize: '16px' }}>
+                        <select value={newExCategory} onChange={e => setNewExCategory(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2.5 text-slate-800 dark:text-slate-100 font-bold appearance-none focus:outline-none focus:border-emerald-500 text-base" style={{ fontSize: '16px' }}>
                           {MUSCLE_CATEGORIES.map(cat => <option key={cat} value={cat}>{cat}</option>)}
                         </select>
                         <div className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none text-xs">▼</div>
                       </div>
                     </div>
-                    <div><label className="block text-xs font-bold text-slate-500 mb-1">種目名 <span className="text-rose-500">*</span></label><input type="text" value={newExName} onChange={e => setNewExName(e.target.value)} required placeholder="例: ベンチプレス" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-800 focus:border-emerald-500 focus:outline-none text-base" style={{ fontSize: '16px' }}/></div>
-                    <div><label className="block text-xs font-bold text-slate-500 mb-1">メーカー (任意)</label><input type="text" value={newExMaker} onChange={e => setNewExMaker(e.target.value)} placeholder="例: Hammer Strength" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-800 focus:border-emerald-500 focus:outline-none text-base" style={{ fontSize: '16px' }}/></div>
+                    <div><label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">種目名 <span className="text-rose-500">*</span></label><input type="text" value={newExName} onChange={e => setNewExName(e.target.value)} required placeholder="例: ベンチプレス" className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-slate-800 dark:text-slate-100 focus:border-emerald-500 focus:outline-none text-base" style={{ fontSize: '16px' }}/></div>
+                    <div><label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">メーカー (任意)</label><input type="text" value={newExMaker} onChange={e => setNewExMaker(e.target.value)} placeholder="例: Hammer Strength" className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-slate-800 dark:text-slate-100 focus:border-emerald-500 focus:outline-none text-base" style={{ fontSize: '16px' }}/></div>
                     <div>
-                       <label className="block text-xs font-bold text-slate-500 mb-1">重さの単位/記録方法 <span className="text-rose-500">*</span></label>
+                       <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">重さの単位/記録方法 <span className="text-rose-500">*</span></label>
                        <div className="grid grid-cols-2 gap-2">
-                          <label className={`text-center py-2 rounded-lg text-sm font-bold border cursor-pointer ${newExWeightType === 'total' ? 'bg-emerald-50 border-emerald-500 text-emerald-600' : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'}`}><input type="radio" value="total" checked={newExWeightType === 'total'} onChange={(e) => setNewExWeightType(e.target.value)} className="hidden"/>合計 (kg)</label>
-                          <label className={`text-center py-2 rounded-lg text-sm font-bold border cursor-pointer ${newExWeightType === 'oneSide' ? 'bg-emerald-50 border-emerald-500 text-emerald-600' : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'}`}><input type="radio" value="oneSide" checked={newExWeightType === 'oneSide'} onChange={(e) => setNewExWeightType(e.target.value)} className="hidden"/>片側 (kg)</label>
-                          <label className={`text-center py-2 rounded-lg text-sm font-bold border cursor-pointer ${newExWeightType === 'plate' ? 'bg-emerald-50 border-emerald-500 text-emerald-600' : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'}`}><input type="radio" value="plate" checked={newExWeightType === 'plate'} onChange={(e) => setNewExWeightType(e.target.value)} className="hidden"/>プレート (枚)</label>
-                          <label className={`text-center py-2 rounded-lg text-sm font-bold border cursor-pointer ${newExWeightType === 'lr' ? 'bg-emerald-50 border-emerald-500 text-emerald-600' : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'}`}><input type="radio" value="lr" checked={newExWeightType === 'lr'} onChange={(e) => setNewExWeightType(e.target.value)} className="hidden"/>片側種目 (左右別)</label>
+                          <label className={`text-center py-2 rounded-lg text-sm font-bold border cursor-pointer ${newExWeightType === 'total' ? 'bg-emerald-50 dark:bg-emerald-900/30 border-emerald-500 text-emerald-600 dark:text-emerald-400' : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'}`}><input type="radio" value="total" checked={newExWeightType === 'total'} onChange={(e) => setNewExWeightType(e.target.value)} className="hidden"/>合計 (kg)</label>
+                          <label className={`text-center py-2 rounded-lg text-sm font-bold border cursor-pointer ${newExWeightType === 'oneSide' ? 'bg-emerald-50 dark:bg-emerald-900/30 border-emerald-500 text-emerald-600 dark:text-emerald-400' : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'}`}><input type="radio" value="oneSide" checked={newExWeightType === 'oneSide'} onChange={(e) => setNewExWeightType(e.target.value)} className="hidden"/>片側 (kg)</label>
+                          <label className={`text-center py-2 rounded-lg text-sm font-bold border cursor-pointer ${newExWeightType === 'plate' ? 'bg-emerald-50 dark:bg-emerald-900/30 border-emerald-500 text-emerald-600 dark:text-emerald-400' : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'}`}><input type="radio" value="plate" checked={newExWeightType === 'plate'} onChange={(e) => setNewExWeightType(e.target.value)} className="hidden"/>プレート (枚)</label>
+                          <label className={`text-center py-2 rounded-lg text-sm font-bold border cursor-pointer ${newExWeightType === 'lr' ? 'bg-emerald-50 dark:bg-emerald-900/30 border-emerald-500 text-emerald-600 dark:text-emerald-400' : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'}`}><input type="radio" value="lr" checked={newExWeightType === 'lr'} onChange={(e) => setNewExWeightType(e.target.value)} className="hidden"/>片側種目 (左右別)</label>
                        </div>
                     </div>
                     <button type="submit" disabled={isAdding || !newExName.trim()} className="w-full bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-bold py-3 rounded-xl mt-2 transition-colors disabled:opacity-50">リストに追加</button>
@@ -1421,27 +1550,27 @@ function ExercisesView({ gyms, exercises }) {
               )}
 
               <div>
-                <h3 className="text-sm font-bold text-slate-500 mb-3 ml-1">登録済みの種目</h3>
+                <h3 className="text-sm font-bold text-slate-500 dark:text-slate-400 mb-3 ml-1">登録済みの種目</h3>
                 <div className="space-y-4">
                   {gyms.map(gym => {
                     const gymExercises = exercises.filter(ex => ex.gymId === gym.id);
                     if (gymExercises.length === 0) return null;
                     return (
-                      <div key={gym.id} className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
-                        <div className="bg-slate-50 px-3 py-2 border-b border-slate-200 font-bold text-slate-700 text-sm flex items-center gap-1"><MapPin size={14} className="text-emerald-500"/> {gym.name}</div>
-                        <div className="divide-y divide-slate-100">
+                      <div key={gym.id} className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl overflow-hidden shadow-sm">
+                        <div className="bg-slate-50 dark:bg-slate-900 px-3 py-2 border-b border-slate-200 dark:border-slate-700 font-bold text-slate-700 dark:text-slate-200 text-sm flex items-center gap-1"><MapPin size={14} className="text-emerald-500"/> {gym.name}</div>
+                        <div className="divide-y divide-slate-100 dark:divide-slate-700">
                           {gymExercises.map(ex => (
                             <div key={ex.id} className="p-3 flex justify-between items-center group">
                               <div>
-                                <p className="font-bold text-slate-800 text-sm flex items-center gap-2">{ex.name}{ex.category && <span className="text-[10px] text-emerald-600 font-bold bg-emerald-100 px-1.5 py-0.5 rounded">{ex.category}</span>}</p>
+                                <p className="font-bold text-slate-800 dark:text-slate-100 text-sm flex items-center gap-2">{ex.name}{ex.category && <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold bg-emerald-100 dark:bg-emerald-900/50 px-1.5 py-0.5 rounded">{ex.category}</span>}</p>
                                 <div className="flex gap-2 mt-1">
-                                  {ex.maker && <span className="text-xs text-slate-400 font-bold bg-slate-100 px-1.5 py-0.5 rounded">{ex.maker}</span>}
-                                  {ex.weightType && <span className="text-[10px] text-emerald-500 font-bold bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-100">{ex.weightType === 'oneSide' ? '片側(kg)' : ex.weightType === 'plate' ? 'プレート(枚)' : ex.weightType === 'lr' ? '片側種目' : '合計(kg)'}</span>}
+                                  {ex.maker && <span className="text-xs text-slate-400 dark:text-slate-500 font-bold bg-slate-100 dark:bg-slate-700 px-1.5 py-0.5 rounded">{ex.maker}</span>}
+                                  {ex.weightType && <span className="text-[10px] text-emerald-500 dark:text-emerald-400 font-bold bg-emerald-50 dark:bg-emerald-900/30 px-1.5 py-0.5 rounded border border-emerald-100 dark:border-emerald-800">{ex.weightType === 'oneSide' ? '片側(kg)' : ex.weightType === 'plate' ? 'プレート(枚)' : ex.weightType === 'lr' ? '片側種目' : '合計(kg)'}</span>}
                                 </div>
                               </div>
                               <div className="flex gap-1">
-                                <button onClick={() => startEdit(ex)} className="p-2 text-slate-400 hover:text-emerald-600 bg-slate-50 hover:bg-emerald-50 rounded-lg transition-colors"><Edit2 size={16} /></button>
-                                <button onClick={() => { if(window.confirm(`${ex.name}を削除しますか？`)) handleDelete('exercises', ex.id); }} className="p-2 text-slate-400 hover:text-rose-500 bg-slate-50 hover:bg-rose-50 rounded-lg transition-colors"><Trash2 size={16} /></button>
+                                <button onClick={() => startEdit(ex)} className="p-2 text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 bg-slate-50 dark:bg-slate-700 hover:bg-emerald-50 dark:hover:bg-slate-600 rounded-lg transition-colors"><Edit2 size={16} /></button>
+                                <button onClick={() => { if(window.confirm(`${ex.name}を削除しますか？`)) handleDelete('exercises', ex.id); }} className="p-2 text-slate-400 hover:text-rose-500 dark:hover:text-rose-400 bg-slate-50 dark:bg-slate-700 hover:bg-rose-50 dark:hover:bg-slate-600 rounded-lg transition-colors"><Trash2 size={16} /></button>
                               </div>
                             </div>
                           ))}
@@ -1478,7 +1607,7 @@ function FriendsView({ partnerName, partnerInfo, posts }) {
 
   return (
     <div className="space-y-6">
-      <h2 className="text-xl font-bold text-slate-900 mb-6">パートナー</h2>
+      <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-6">パートナー</h2>
       <div className={`rounded-3xl p-6 relative overflow-hidden shadow-lg w-full text-white transition-colors duration-500 ${cardGradient}`}>
         <div className="absolute top-0 right-0 w-40 h-40 bg-white/10 rounded-full blur-2xl -mr-10 -mt-10"></div>
         <div className="absolute bottom-0 left-0 w-32 h-32 bg-black/10 rounded-full blur-2xl -ml-10 -mb-10"></div>
@@ -1492,34 +1621,41 @@ function FriendsView({ partnerName, partnerInfo, posts }) {
           </div>
           <p className="font-bold text-2xl mb-1">{partnerName}</p>
           
+          {partnerInfo?.goal && (
+             <div className="mt-2 bg-black/20 px-4 py-2 rounded-xl text-sm font-bold backdrop-blur-sm w-full max-w-[280px]">
+                <p className="text-white/80 text-xs mb-1">目標</p>
+                <p className="text-white break-words">{partnerInfo.goal}</p>
+             </div>
+          )}
+
           {isTraining ? (
-            <div className="mt-2 inline-flex items-center gap-2 bg-black/20 px-4 py-2 rounded-full text-sm font-bold backdrop-blur-sm"><Flame size={16} className="text-amber-300 animate-pulse" /> トレーニング中 <TimerDisplay startTime={partnerInfo.trainingStartTime} /></div>
+            <div className="mt-4 inline-flex items-center gap-2 bg-black/30 px-4 py-2 rounded-full text-sm font-bold backdrop-blur-sm"><Flame size={16} className="text-amber-300 animate-pulse" /> トレーニング中 <TimerDisplay startTime={partnerInfo.trainingStartTime} /></div>
           ) : isOnline ? (
-            <div className="mt-2 inline-flex items-center gap-2 bg-black/20 px-4 py-1.5 rounded-full text-sm font-bold backdrop-blur-sm"><Circle fill="currentColor" size={10} className="text-emerald-300 animate-pulse" /> オンライン</div>
+            <div className="mt-4 inline-flex items-center gap-2 bg-black/30 px-4 py-1.5 rounded-full text-sm font-bold backdrop-blur-sm"><Circle fill="currentColor" size={10} className="text-emerald-300 animate-pulse" /> オンライン</div>
           ) : (
-            <div className="mt-2 inline-flex items-center gap-2 bg-black/20 px-4 py-1.5 rounded-full text-sm font-bold backdrop-blur-sm text-slate-200"><Circle fill="currentColor" size={10} className="text-slate-300" /> オフライン</div>
+            <div className="mt-4 inline-flex items-center gap-2 bg-black/20 px-4 py-1.5 rounded-full text-sm font-bold backdrop-blur-sm text-slate-200"><Circle fill="currentColor" size={10} className="text-slate-300" /> オフライン</div>
           )}
         </div>
       </div>
 
-      <div className="bg-white border border-slate-200 rounded-2xl p-5 mt-4 shadow-sm">
-        <h3 className="text-slate-700 font-bold mb-3 text-sm">システムステータス</h3>
+      <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-5 mt-4 shadow-sm">
+        <h3 className="text-slate-700 dark:text-slate-300 font-bold mb-3 text-sm">システムステータス</h3>
         <ul className="space-y-3 text-sm font-bold">
           <li className="flex items-center justify-between">
-            <span className="text-slate-500">ネットワーク接続</span>
-            <span className="text-slate-700 flex items-center gap-1">
-              {typeof navigator !== 'undefined' && navigator.onLine ? <span className="text-emerald-600 flex items-center gap-1 bg-emerald-50 px-2 py-1 rounded-md"><Activity size={14}/> 良好</span> : <span className="text-rose-500 flex items-center gap-1 bg-rose-50 px-2 py-1 rounded-md"><X size={14}/> オフライン</span>}
+            <span className="text-slate-500 dark:text-slate-400">ネットワーク接続</span>
+            <span className="text-slate-700 dark:text-slate-200 flex items-center gap-1">
+              {typeof navigator !== 'undefined' && navigator.onLine ? <span className="text-emerald-600 dark:text-emerald-400 flex items-center gap-1 bg-emerald-50 dark:bg-emerald-900/30 px-2 py-1 rounded-md"><Activity size={14}/> 良好</span> : <span className="text-rose-500 dark:text-rose-400 flex items-center gap-1 bg-rose-50 dark:bg-rose-900/30 px-2 py-1 rounded-md"><X size={14}/> オフライン</span>}
             </span>
           </li>
-          <li className="flex items-center justify-between border-t border-slate-100 pt-3">
-            <span className="text-slate-500">データ保存先</span>
-            <a href={`https://console.firebase.google.com/project/${FIREBASE_PROJECT_ID}/firestore/data`} target="_blank" rel="noreferrer" className="text-emerald-600 hover:text-emerald-700 text-xs bg-emerald-50 hover:bg-emerald-100 border border-emerald-100 px-2 py-1 rounded-md transition-colors">Firestore データを確認</a>
+          <li className="flex items-center justify-between border-t border-slate-100 dark:border-slate-700 pt-3">
+            <span className="text-slate-500 dark:text-slate-400">データ保存先</span>
+            <a href={`https://console.firebase.google.com/project/${FIREBASE_PROJECT_ID}/firestore/data`} target="_blank" rel="noreferrer" className="text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 text-xs bg-emerald-50 dark:bg-emerald-900/30 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 border border-emerald-100 dark:border-emerald-800 px-2 py-1 rounded-md transition-colors">Firestore データを確認</a>
           </li>
         </ul>
       </div>
 
       <div className="space-y-6 pt-4">
-         <h3 className="text-lg font-bold text-slate-800">{partnerName}のデータ</h3>
+         <h3 className="text-lg font-bold text-slate-800 dark:text-white">{partnerName}のデータ</h3>
          <SimpleChart data={weightData} color="#10b981" title="体重の推移 (kg)" />
          <SimpleChart data={fatData} color="#6366f1" title="体脂肪率の推移 (%)" />
       </div>
@@ -1532,13 +1668,13 @@ function NavButton({ icon, label, isActive, onClick, isPrimary, isTraining }) {
   if (isPrimary) {
     return (
       <button onClick={onClick} className="flex flex-col items-center justify-center -mt-8 relative group">
-        <div className={`w-16 h-16 rounded-full flex items-center justify-center shadow-lg transition-all duration-300 text-white ${isTraining ? 'bg-amber-500 shadow-amber-500/40 scale-110' : isActive ? 'bg-emerald-500 shadow-emerald-500/40 scale-110' : 'bg-slate-800 border-4 border-white group-hover:bg-slate-700'}`}><div>{icon}</div></div>
-        <span className={`text-[10px] mt-1 font-bold transition-colors ${isTraining ? 'text-amber-500' : isActive ? 'text-emerald-600' : 'text-slate-500'}`}>{label}</span>
+        <div className={`w-16 h-16 rounded-full flex items-center justify-center shadow-lg transition-all duration-300 text-white ${isTraining ? 'bg-amber-500 shadow-amber-500/40 scale-110' : isActive ? 'bg-emerald-500 shadow-emerald-500/40 scale-110' : 'bg-slate-800 dark:bg-slate-600 border-4 border-white dark:border-slate-800 group-hover:bg-slate-700 dark:group-hover:bg-slate-500'}`}><div>{icon}</div></div>
+        <span className={`text-[10px] mt-1 font-bold transition-colors ${isTraining ? 'text-amber-500' : isActive ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-500 dark:text-slate-400'}`}>{label}</span>
       </button>
     );
   }
   return (
-    <button onClick={onClick} className={`flex flex-col items-center justify-center w-16 transition-colors duration-200 ${isActive ? 'text-emerald-500' : 'text-slate-400 hover:text-slate-600'}`}>
+    <button onClick={onClick} className={`flex flex-col items-center justify-center w-16 transition-colors duration-200 ${isActive ? 'text-emerald-500 dark:text-emerald-400' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}>
       <div className={`mb-1 transition-transform duration-200 ${isActive ? 'scale-110' : ''}`}>{icon}</div>
       <span className="text-[10px] font-bold">{label}</span>
     </button>
