@@ -184,7 +184,7 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
 
     return (
       <div className={`flex justify-between text-sm items-center border-b border-slate-200/50 pb-1.5 pt-1.5 last:border-0 ${isDrop ? 'pl-8 text-slate-500' : ''}`}>
-        <span className={`font-bold w-12 text-xs shrink-0 ${isDrop ? 'text-orange-500' : 'text-slate-500'}`}>{isDrop ? `↳ Drop` : label}</span>
+        <span className={`font-bold w-12 text-xs shrink-0 ${isDrop ? 'text-orange-500' : 'text-slate-500'}`}>{isDrop ? `↳ drop` : label}</span>
         {isLR ? (
            <div className="flex-1 flex justify-between items-center px-1">
              <span className="font-bold text-slate-700 text-center w-12 shrink-0">{set.weight || 0} <span className="text-[10px] font-bold text-slate-400 ml-0.5">kg</span></span>
@@ -255,7 +255,7 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
                 <div key={sIdx} className="mb-2">
                   {renderSetRow(set, item.weightType, false, `set ${sIdx + 1}`)}
                   {item.isSuperSet && renderSetRow({ weight: set.superWeight, reps: set.superReps, lReps: set.superLReps, rReps: set.superRReps, forcedReps: set.superForcedReps }, item.superWeightType, true, '↳ Sup')}
-                  {item.isDropSet && set.dropSets && set.dropSets.map((ds, dsIdx) => <div key={dsIdx}>{renderSetRow(ds, item.weightType, true, '↳ Drop')}</div>)}
+                  {item.isDropSet && set.dropSets && set.dropSets.map((ds, dsIdx) => <div key={dsIdx}>{renderSetRow(ds, item.weightType, true, '↳ drop')}</div>)}
                 </div>
               ))}
             </div>
@@ -397,7 +397,7 @@ function WorkoutItemForm({ item, index, totalCount, availableExercises, updateIt
               <div className="pl-6 mt-2 space-y-2">
                 {set.dropSets && set.dropSets.map(ds => (
                   <div key={ds.id} className="flex items-center gap-1 border-l-2 border-orange-200 pl-2">
-                    <span className="text-[10px] font-bold text-orange-400 shrink-0">Drop</span>
+                    <span className="text-[10px] font-bold text-orange-400 shrink-0">drop</span>
                     {renderInputRow({ ...ds, _parentId: set.id }, item.weightType, false, true, ds.id)}
                     <button onClick={() => removeDropSet(item.id, set.id, ds.id)} className="w-6 flex-shrink-0 text-slate-400 hover:text-rose-500 flex justify-center"><X size={16} /></button>
                   </div>
