@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Heart, Home, PlusCircle, Users, Dumbbell, LogOut, Activity, Flame, Lock, Settings, Trash2, Plus, X, ListPlus, MapPin, Clock, Play, Circle, Edit2, KeyRound, AlignLeft, Scale, Calendar as CalendarIcon, Zap, TrendingDown, GripVertical, Copy, Moon, Sun, Target, Trophy } from 'lucide-react';
+import { Heart, Home, PlusCircle, Users, Dumbbell, LogOut, Activity, Flame, Lock, Settings, Trash2, Plus, X, ListPlus, MapPin, Clock, Play, Circle, Edit2, KeyRound, AlignLeft, Scale, Calendar as CalendarIcon, Zap, TrendingDown, Copy, Moon, Sun, Target, Trophy, ArrowUp, ArrowDown } from 'lucide-react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
 import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot, enableIndexedDbPersistence } from 'firebase/firestore';
@@ -108,6 +108,8 @@ const formatShortDateTime = (timestamp) => {
 };
 
 const calcSetVolume = (weight, reps, lReps, rReps, forcedReps, wType) => {
+  if (wType === 'assist') return 0; // アシスト種目は総負荷量に加算しない
+
   let v = 0;
   const w = Number(weight) || 0;
   const r = Number(reps) || 0;
@@ -136,8 +138,19 @@ const calculateTotalVolume = (items) => {
     if (!item.sets || !Array.isArray(item.sets)) return;
     item.sets.forEach(set => {
       volume += calcSetVolume(set.weight, set.reps, set.lReps, set.rReps, set.forcedReps, item.weightType);
-      if (item.isSuperSet) { volume += calcSetVolume(set.superWeight, set.superReps, set.superLReps, set.superRReps, set.superForcedReps, item.superWeightType); }
-      if (item.isDropSet && set.dropSets && Array.isArray(set.dropSets)) { set.dropSets.forEach(ds => { volume += calcSetVolume(ds.weight, ds.reps, ds.lReps, ds.rReps, ds.forcedReps, item.weightType); }); }
+      if (item.isSuperSet) { 
+        if (item.superExerciseName) volume += calcSetVolume(set.superWeight, set.superReps, set.superLReps, set.superRReps, set.superForcedReps, item.superWeightType); 
+        if (item.superExerciseName3) volume += calcSetVolume(set.superWeight3, set.superReps3, set.superLReps3, set.superRReps3, set.superForcedReps3, item.superWeightType3); 
+      }
+      if (item.isDropSet && set.dropSets && Array.isArray(set.dropSets)) { 
+        set.dropSets.forEach(ds => { 
+          volume += calcSetVolume(ds.weight, ds.reps, ds.lReps, ds.rReps, ds.forcedReps, item.weightType); 
+          if (item.isSuperSet) {
+            if (item.superExerciseName) volume += calcSetVolume(ds.superWeight, ds.superReps, ds.superLReps, ds.superRReps, ds.superForcedReps, item.superWeightType); 
+            if (item.superExerciseName3) volume += calcSetVolume(ds.superWeight3, ds.superReps3, ds.superLReps3, ds.superRReps3, ds.superForcedReps3, item.superWeightType3); 
+          }
+        }); 
+      }
     });
   });
   return volume;
@@ -203,23 +216,52 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
   const authorInfo = accountsInfo && accountsInfo[post.author];
   const userColor = post.author === '勇太' ? 'bg-indigo-500' : 'bg-rose-500';
 
-  const renderSetRow = (set, wType, isDrop, label) => {
+  const renderSetRow = (setObj, wType, type, isDrop, label) => {
     const isLR = wType === 'lr';
     const isPlate = wType === 'plate';
-    const forced = set.forcedReps ? <span className="text-rose-500 text-xs ml-1">(+{set.forcedReps}補助)</span> : null;
+    const isBodyWeight = wType === 'bodyWeight';
+    const isAssist = wType === 'assist';
+    
+    let prefix = '';
+    if (type === 'super2') prefix = 'super';
+    if (type === 'super3') prefix = 'super'; // 値取得時に 3 を付与
+    
+    const val = (f) => {
+      let fieldName = f;
+      if (type === 'super2') fieldName = 'super' + f.charAt(0).toUpperCase() + f.slice(1);
+      if (type === 'super3') fieldName = 'super' + f.charAt(0).toUpperCase() + f.slice(1) + '3';
+      return setObj[fieldName] || '';
+    };
+
+    const weight = val('weight');
+    const reps = val('reps');
+    const lReps = val('lReps');
+    const rReps = val('rReps');
+    const forcedReps = val('forcedReps');
+
+    // データが入力されていない行は表示しない
+    if (!weight && !reps && !lReps && !rReps) return null;
+
+    const forced = forcedReps ? <span className="text-rose-500 text-xs ml-1">(+{forcedReps})</span> : null;
+
+    let weightLabel = 'kg';
+    if (isPlate) weightLabel = '枚';
+    else if (wType === 'oneSide') weightLabel = 'kg(片)';
+    else if (isBodyWeight) weightLabel = 'kg加重';
+    else if (isAssist) weightLabel = 'kgアシスト';
 
     return (
       <div className={`flex justify-between items-center border-b border-slate-200/50 dark:border-slate-700/50 pb-2 pt-2 last:border-0 ${isDrop ? 'pl-8' : ''}`}>
-        <span className={`font-bold w-14 text-sm shrink-0 ${isDrop ? 'text-orange-500' : 'text-slate-500 dark:text-slate-400'}`}>
-          {isDrop ? `↳ drop` : label}
+        <span className={`font-bold w-16 text-sm shrink-0 ${isDrop ? 'text-orange-500' : 'text-slate-500 dark:text-slate-400'} ${type !== 'main' && !isDrop ? 'pl-4 text-indigo-500 dark:text-indigo-400' : ''}`}>
+          {label}
         </span>
         {isLR ? (
            <div className="flex-1 flex justify-between items-center px-1 gap-2">
              <span className="font-bold text-lg tracking-wide text-slate-800 dark:text-slate-100 text-center w-20 shrink-0">
-               {set.weight || 0} <span className="text-xs font-normal text-slate-400 dark:text-slate-500 ml-0.5">kg</span>
+               {weight || 0} <span className="text-xs font-normal text-slate-400 dark:text-slate-500 ml-0.5">kg</span>
              </span>
              <span className="font-bold text-lg tracking-wide text-slate-800 dark:text-slate-100 flex-1 text-right">
-               L:{set.lReps || 0} <span className="text-slate-300 dark:text-slate-600 font-normal mx-1">/</span> R:{set.rReps || 0}
+               L:{lReps || 0} <span className="text-slate-300 dark:text-slate-600 font-normal mx-1">/</span> R:{rReps || 0}
                <span className="text-xs font-normal text-slate-400 dark:text-slate-500 ml-0.5">回</span>
                {forced}
              </span>
@@ -227,13 +269,13 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
         ) : (
            <div className="flex-1 flex justify-between items-center px-1 gap-2">
              <span className="font-bold text-lg tracking-wide text-slate-800 dark:text-slate-100 text-center flex-1">
-               {set.weight || 0} 
+               {isAssist && weight ? `-${weight}` : (weight || 0)} 
                <span className="text-xs font-normal text-slate-400 dark:text-slate-500 ml-1">
-                 {isPlate ? '枚' : (wType === 'oneSide' ? 'kg(片)' : 'kg')}
+                 {weightLabel}
                </span>
              </span>
              <span className="font-bold text-lg tracking-wide text-slate-800 dark:text-slate-100 w-24 text-right shrink-0">
-               {set.reps || 0} <span className="text-xs font-normal text-slate-400 dark:text-slate-500 ml-0.5">回</span>
+               {reps || 0} <span className="text-xs font-normal text-slate-400 dark:text-slate-500 ml-0.5">回</span>
                {forced}
              </span>
            </div>
@@ -295,23 +337,40 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
         {post.items && Array.isArray(post.items) && post.items.map((item, idx) => (
           <div key={idx} className="bg-slate-50 dark:bg-slate-900/50 rounded-xl p-3 border border-slate-100 dark:border-slate-700">
             <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2 flex-wrap flex-1">
-                <Dumbbell size={14} className="text-emerald-500" />
-                <span className="font-bold text-slate-800 dark:text-slate-100 text-[15px]">{item.exerciseName}</span>
+              <div className="flex flex-col gap-1.5 flex-1">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Dumbbell size={14} className="text-emerald-500" />
+                  <span className="font-bold text-slate-800 dark:text-slate-100 text-[15px]">{item.exerciseName}</span>
+                  {item.category && <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${getCategoryColor(item.category)}`}>{item.category}</span>}
+                </div>
                 {item.isSuperSet && item.superExerciseName && (
-                  <span className="font-bold text-indigo-600 dark:text-indigo-400 text-sm flex items-center gap-1"><Zap size={14} className="text-indigo-400"/> {item.superExerciseName}</span>
+                  <div className="flex items-center gap-2 flex-wrap pl-5">
+                    <Zap size={14} className="text-indigo-400"/>
+                    <span className="font-bold text-indigo-600 dark:text-indigo-400 text-sm">{item.superExerciseName}</span>
+                  </div>
                 )}
-                {item.category && <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${getCategoryColor(item.category)}`}>{item.category}</span>}
+                {item.isSuperSet && item.superExerciseName3 && (
+                  <div className="flex items-center gap-2 flex-wrap pl-5">
+                    <Zap size={14} className="text-indigo-400"/>
+                    <span className="font-bold text-indigo-600 dark:text-indigo-400 text-sm">{item.superExerciseName3}</span>
+                  </div>
+                )}
               </div>
             </div>
 
             <div className="space-y-1">
               {item.sets && Array.isArray(item.sets) && item.sets.map((set, sIdx) => (
                 <div key={sIdx} className="mb-2">
-                  {renderSetRow(set, item.weightType, false, `set ${sIdx + 1}`)}
-                  {item.isSuperSet && renderSetRow({ weight: set.superWeight, reps: set.superReps, lReps: set.superLReps, rReps: set.superRReps, forcedReps: set.superForcedReps }, item.superWeightType, true, '↳ Sup')}
+                  {renderSetRow(set, item.weightType, 'main', false, `set ${sIdx + 1}`)}
+                  {item.isSuperSet && item.superExerciseName && renderSetRow(set, item.superWeightType || 'total', 'super2', false, '↳ Sup2')}
+                  {item.isSuperSet && item.superExerciseName3 && renderSetRow(set, item.superWeightType3 || 'total', 'super3', false, '↳ Sup3')}
+                  
                   {item.isDropSet && set.dropSets && set.dropSets.map((ds, dsIdx) => (
-                    <div key={dsIdx}>{renderSetRow(ds, item.weightType, true, '↳ drop')}</div>
+                    <div key={dsIdx}>
+                      {renderSetRow(ds, item.weightType, 'main', true, '↳ drop')}
+                      {item.isSuperSet && item.superExerciseName && renderSetRow(ds, item.superWeightType || 'total', 'super2', true, '↳ Sup2')}
+                      {item.isSuperSet && item.superExerciseName3 && renderSetRow(ds, item.superWeightType3 || 'total', 'super3', true, '↳ Sup3')}
+                    </div>
                   ))}
                 </div>
               ))}
@@ -350,38 +409,46 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
 }
 
 // --- 共通コンポーネント：ワークアウト入力フォーム ---
-function WorkoutItemForm({ item, index, availableExercises, updateItem, removeItem, addSet, removeSet, updateSet, addDropSet, removeDropSet, updateDropSet, onDragStart, onDragOver, onDragEnd }) {
+function WorkoutItemForm({ item, index, isFirst, isLast, availableExercises, updateItem, removeItem, moveItemUp, moveItemDown, addSet, removeSet, updateSet, addDropSet, removeDropSet, updateDropSet }) {
   
-  const updateExerciseName = (newName, isSuper = false) => {
+  const updateExerciseName = (newName, superIndex = 0) => {
     const exData = availableExercises.find(ex => ex.name === newName);
-    if (isSuper) {
-      updateItem(item.id, { 
-        superExerciseName: newName, 
-        superWeightType: exData ? (exData.weightType || 'total') : 'total' 
-      });
+    if (superIndex === 2) {
+      updateItem(item.id, { superExerciseName: newName, superWeightType: exData ? (exData.weightType || 'total') : 'total' });
+    } else if (superIndex === 3) {
+      updateItem(item.id, { superExerciseName3: newName, superWeightType3: exData ? (exData.weightType || 'total') : 'total' });
     } else {
-      updateItem(item.id, { 
-        exerciseName: newName, 
-        weightType: exData ? (exData.weightType || 'total') : 'total',
-        category: exData ? (exData.category || 'その他') : 'その他',
-        maker: exData ? exData.maker : ''
-      });
+      updateItem(item.id, { exerciseName: newName, weightType: exData ? (exData.weightType || 'total') : 'total', category: exData ? (exData.category || 'その他') : 'その他', maker: exData ? exData.maker : '' });
     }
   };
 
   const getWeightPlaceholder = (type) => {
     if (type === 'oneSide') return '片側kg';
     if (type === 'plate') return '枚数';
-    return '合計kg';
+    if (type === 'bodyWeight') return '加重kg';
+    if (type === 'assist') return '-補助kg';
+    return '重量kg';
   };
 
-  const renderInputRow = (setObj, wType, isSuper, isDrop, dropId = null) => {
+  const renderInputRow = (setObj, wType, type, isDrop, dropId = null) => {
     const isLR = wType === 'lr';
-    const prefix = isSuper ? 'super' : '';
-    const val = (f) => setObj[prefix ? prefix + f.charAt(0).toUpperCase() + f.slice(1) : f] || '';
+    
+    let prefix = '';
+    if (type === 'super2') prefix = 'super';
+    if (type === 'super3') prefix = 'super';
+
+    const val = (f) => {
+      let fieldName = f;
+      if (type === 'super2') fieldName = 'super' + f.charAt(0).toUpperCase() + f.slice(1);
+      if (type === 'super3') fieldName = 'super' + f.charAt(0).toUpperCase() + f.slice(1) + '3';
+      return setObj[fieldName] || '';
+    };
     
     const update = (f, v) => {
-      const fieldName = prefix ? prefix + f.charAt(0).toUpperCase() + f.slice(1) : f;
+      let fieldName = f;
+      if (type === 'super2') fieldName = 'super' + f.charAt(0).toUpperCase() + f.slice(1);
+      if (type === 'super3') fieldName = 'super' + f.charAt(0).toUpperCase() + f.slice(1) + '3';
+
       if (isDrop) updateDropSet(item.id, setObj._parentId, dropId, fieldName, v);
       else updateSet(item.id, setObj.id, fieldName, v);
     };
@@ -390,7 +457,7 @@ function WorkoutItemForm({ item, index, availableExercises, updateItem, removeIt
       <div className="flex-1 flex gap-2 min-w-0">
         {isLR ? (
           <>
-            <input type="number" value={val('weight')} onChange={(e) => update('weight', e.target.value)} placeholder="重量" className="w-[60px] shrink-0 text-center text-base font-bold text-slate-800 dark:text-slate-100 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded focus:outline-none focus:border-emerald-500 py-2 px-0" style={{ fontSize: '16px' }}/>
+            <input type="number" value={val('weight')} onChange={(e) => update('weight', e.target.value)} placeholder={getWeightPlaceholder(wType)} className="w-[64px] shrink-0 text-center text-base font-bold text-slate-800 dark:text-slate-100 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded focus:outline-none focus:border-emerald-500 py-2 px-0" style={{ fontSize: '16px' }}/>
             <div className="flex flex-1 items-center gap-1 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 rounded px-2 min-w-0">
               <span className="text-xs text-slate-400 font-bold shrink-0">L:</span>
               <input type="number" value={val('lReps')} onChange={(e) => update('lReps', e.target.value)} placeholder="0" className="w-full text-center text-base font-bold text-slate-800 dark:text-slate-100 bg-transparent focus:outline-none min-w-0" style={{ fontSize: '16px' }}/>
@@ -402,8 +469,8 @@ function WorkoutItemForm({ item, index, availableExercises, updateItem, removeIt
           </>
         ) : (
           <>
-            <input type="number" value={val('weight')} onChange={(e) => update('weight', e.target.value)} placeholder="0" className="flex-1 min-w-0 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded py-2 px-2 text-center text-slate-800 dark:text-slate-100 font-bold focus:outline-none focus:border-emerald-500 text-base" style={{ fontSize: '16px' }}/>
-            <input type="number" value={val('reps')} onChange={(e) => update('reps', e.target.value)} placeholder="0" className="flex-1 min-w-0 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded py-2 px-2 text-center text-slate-800 dark:text-slate-100 font-bold focus:outline-none focus:border-emerald-500 text-base" style={{ fontSize: '16px' }}/>
+            <input type="number" value={val('weight')} onChange={(e) => update('weight', e.target.value)} placeholder={getWeightPlaceholder(wType)} className="flex-1 min-w-0 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded py-2 px-1 text-center text-slate-800 dark:text-slate-100 font-bold focus:outline-none focus:border-emerald-500 text-base" style={{ fontSize: '16px' }}/>
+            <input type="number" value={val('reps')} onChange={(e) => update('reps', e.target.value)} placeholder="回数" className="flex-1 min-w-0 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded py-2 px-1 text-center text-slate-800 dark:text-slate-100 font-bold focus:outline-none focus:border-emerald-500 text-base" style={{ fontSize: '16px' }}/>
           </>
         )}
         {item.isForcedReps && (
@@ -414,18 +481,15 @@ function WorkoutItemForm({ item, index, availableExercises, updateItem, removeIt
   };
 
   return (
-    <div 
-      draggable
-      onDragStart={(e) => onDragStart && onDragStart(e, index)}
-      onDragOver={(e) => onDragOver && onDragOver(e, index)}
-      onDragEnd={onDragEnd}
-      className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-4 shadow-sm relative w-full overflow-hidden mb-6 transition-all duration-200"
-    >
+    <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-4 shadow-sm relative w-full overflow-hidden mb-6 transition-all duration-200">
       <div className="flex justify-between items-center mb-4">
-        <div className="flex items-center gap-2 flex-1 min-w-0">
-          <div className="cursor-move p-1 text-slate-300 dark:text-slate-500 hover:text-slate-500 dark:hover:text-slate-300 active:cursor-grabbing rounded"><GripVertical size={20} /></div>
-          <div className="relative flex-1 min-w-0">
-            <select value={item.exerciseName} onChange={(e) => updateExerciseName(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2.5 text-slate-800 dark:text-slate-100 font-bold appearance-none focus:outline-none focus:border-emerald-500 text-base pr-8" style={{ fontSize: '16px' }}>
+        <div className="flex items-center gap-1.5 flex-1 min-w-0">
+          <div className="flex flex-col gap-0.5">
+            <button onClick={() => moveItemUp(index)} disabled={isFirst} className="p-1 text-slate-400 hover:text-emerald-500 disabled:opacity-30 bg-slate-50 dark:bg-slate-700 rounded transition-colors"><ArrowUp size={14}/></button>
+            <button onClick={() => moveItemDown(index)} disabled={isLast} className="p-1 text-slate-400 hover:text-emerald-500 disabled:opacity-30 bg-slate-50 dark:bg-slate-700 rounded transition-colors"><ArrowDown size={14}/></button>
+          </div>
+          <div className="relative flex-1 min-w-0 ml-1">
+            <select value={item.exerciseName} onChange={(e) => updateExerciseName(e.target.value, 0)} className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2.5 text-slate-800 dark:text-slate-100 font-bold appearance-none focus:outline-none focus:border-emerald-500 text-base pr-8" style={{ fontSize: '16px' }}>
               <option value="" disabled>種目を選択</option>
               {availableExercises.map(ex => <option key={ex.id} value={ex.name}>{ex.name}{ex.maker ? `（${ex.maker}）` : ''}</option>)}
             </select>
@@ -442,29 +506,30 @@ function WorkoutItemForm({ item, index, availableExercises, updateItem, removeIt
       </div>
 
       {item.isSuperSet && (
-        <div className="mb-5 pl-8 border-l-2 border-indigo-300 dark:border-indigo-600">
+        <div className="mb-5 pl-8 border-l-2 border-indigo-300 dark:border-indigo-600 space-y-3">
           <div className="relative w-full">
-            <select value={item.superExerciseName || ''} onChange={(e) => updateExerciseName(e.target.value, true)} className="w-full bg-indigo-50/30 dark:bg-indigo-900/20 border border-indigo-100 dark:border-indigo-800 rounded-lg px-3 py-2 text-indigo-800 dark:text-indigo-300 font-bold appearance-none focus:outline-none focus:border-indigo-300 text-base pr-8" style={{ fontSize: '16px' }}>
-              <option value="" disabled>スーパーセットの種目</option>
+            <select value={item.superExerciseName || ''} onChange={(e) => updateExerciseName(e.target.value, 2)} className="w-full bg-indigo-50/30 dark:bg-indigo-900/20 border border-indigo-100 dark:border-indigo-800 rounded-lg px-3 py-2 text-indigo-800 dark:text-indigo-300 font-bold appearance-none focus:outline-none focus:border-indigo-300 text-base pr-8" style={{ fontSize: '16px' }}>
+              <option value="" disabled>スーパーセットの種目 (2種目目)</option>
               {availableExercises.map(ex => <option key={ex.id} value={ex.name}>{ex.name}</option>)}
             </select>
             <div className="absolute right-3 top-1/2 -translate-y-1/2 text-indigo-300 pointer-events-none text-xs">▼</div>
           </div>
+          {item.superExerciseName && (
+            <div className="relative w-full">
+              <select value={item.superExerciseName3 || ''} onChange={(e) => updateExerciseName(e.target.value, 3)} className="w-full bg-indigo-50/30 dark:bg-indigo-900/20 border border-indigo-100 dark:border-indigo-800 rounded-lg px-3 py-2 text-indigo-800 dark:text-indigo-300 font-bold appearance-none focus:outline-none focus:border-indigo-300 text-base pr-8" style={{ fontSize: '16px' }}>
+                <option value="">ジャイアントセット (3種目目・任意)</option>
+                {availableExercises.map(ex => <option key={ex.id} value={ex.name}>{ex.name}</option>)}
+              </select>
+              <div className="absolute right-3 top-1/2 -translate-y-1/2 text-indigo-300 pointer-events-none text-xs">▼</div>
+            </div>
+          )}
         </div>
       )}
 
-      <div className="space-y-3 mb-5 w-full pl-2">
-        <div className="flex text-xs text-slate-500 dark:text-slate-400 font-bold px-1">
+      <div className="space-y-4 mb-5 w-full pl-2">
+        <div className="flex text-[10px] text-slate-500 dark:text-slate-400 font-bold px-1 mb-1">
           <div className="w-10 text-center shrink-0">Set</div>
-          {item.weightType === 'lr' ? (
-            <div className="flex-1 flex gap-2 px-0 min-w-0">
-              <span className="w-[60px] text-center shrink-0">重量</span>
-              <span className="flex-1 text-center">左(回) / 右(回)</span>
-            </div>
-          ) : (
-            <><div className="flex-1 text-center min-w-0">{getWeightPlaceholder(item.weightType)}</div><div className="flex-1 text-center min-w-0">Reps</div></>
-          )}
-          {item.isForcedReps && <div className="w-12 text-center text-rose-400 shrink-0">+補助</div>}
+          <div className="flex-1 text-center min-w-0">記録</div>
           <div className="w-6 shrink-0"></div>
         </div>
         
@@ -472,28 +537,52 @@ function WorkoutItemForm({ item, index, availableExercises, updateItem, removeIt
           <div key={set.id} className="bg-slate-50/50 dark:bg-slate-700/30 p-2.5 rounded-xl border border-slate-100 dark:border-slate-700 space-y-3">
             <div className="flex items-center gap-2">
               <div className="w-10 text-center text-slate-400 dark:text-slate-500 font-bold text-sm shrink-0">{sIndex + 1}</div>
-              {renderInputRow(set, item.weightType, false, false)}
+              {renderInputRow(set, item.weightType, 'main', false)}
               <button onClick={() => removeSet(item.id, set.id)} disabled={item.sets.length === 1} className="w-6 flex-shrink-0 text-slate-400 hover:text-rose-500 disabled:opacity-30 flex justify-center"><X size={18} /></button>
             </div>
 
-            {item.isSuperSet && (
+            {item.isSuperSet && item.superExerciseName && (
               <div className="flex items-center gap-2 pl-8 mt-2 border-l-2 border-indigo-200 dark:border-indigo-700 ml-1">
                 <Zap size={16} className="text-indigo-400 flex-shrink-0" />
-                {renderInputRow(set, item.superWeightType || 'total', true, false)}
+                {renderInputRow(set, item.superWeightType || 'total', 'super2', false)}
+                <div className="w-6 shrink-0"></div>
+              </div>
+            )}
+            
+            {item.isSuperSet && item.superExerciseName3 && (
+              <div className="flex items-center gap-2 pl-8 mt-2 border-l-2 border-indigo-200 dark:border-indigo-700 ml-1">
+                <Zap size={16} className="text-indigo-400 flex-shrink-0" />
+                {renderInputRow(set, item.superWeightType3 || 'total', 'super3', false)}
                 <div className="w-6 shrink-0"></div>
               </div>
             )}
 
             {item.isDropSet && (
-              <div className="pl-6 mt-3 space-y-3">
+              <div className="pl-4 mt-3 space-y-4">
                 {set.dropSets && set.dropSets.map(ds => (
-                  <div key={ds.id} className="flex items-center gap-2 border-l-2 border-orange-200 dark:border-orange-700 pl-2">
-                    <TrendingDown size={16} className="text-orange-400 flex-shrink-0" />
-                    {renderInputRow({ ...ds, _parentId: set.id }, item.weightType, false, true, ds.id)}
-                    <button onClick={() => removeDropSet(item.id, set.id, ds.id)} className="w-6 flex-shrink-0 text-slate-400 hover:text-rose-500 flex justify-center"><X size={18} /></button>
+                  <div key={ds.id} className="border-l-2 border-orange-200 dark:border-orange-700 pl-3 space-y-3">
+                    <div className="flex items-center gap-2">
+                      <TrendingDown size={16} className="text-orange-400 flex-shrink-0" />
+                      {renderInputRow({ ...ds, _parentId: set.id }, item.weightType, 'main', true, ds.id)}
+                      <button onClick={() => removeDropSet(item.id, set.id, ds.id)} className="w-6 flex-shrink-0 text-slate-400 hover:text-rose-500 flex justify-center"><X size={18} /></button>
+                    </div>
+                    {item.isSuperSet && item.superExerciseName && (
+                      <div className="flex items-center gap-2 pl-6">
+                        <Zap size={16} className="text-indigo-400 flex-shrink-0" />
+                        {renderInputRow({ ...ds, _parentId: set.id }, item.superWeightType || 'total', 'super2', true, ds.id)}
+                        <div className="w-6 shrink-0"></div>
+                      </div>
+                    )}
+                    {item.isSuperSet && item.superExerciseName3 && (
+                      <div className="flex items-center gap-2 pl-6">
+                        <Zap size={16} className="text-indigo-400 flex-shrink-0" />
+                        {renderInputRow({ ...ds, _parentId: set.id }, item.superWeightType3 || 'total', 'super3', true, ds.id)}
+                        <div className="w-6 shrink-0"></div>
+                      </div>
+                    )}
                   </div>
                 ))}
-                <button onClick={() => addDropSet(item.id, set.id)} className="ml-8 text-xs text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-900/30 hover:bg-orange-100 dark:hover:bg-orange-900/50 border border-orange-200 dark:border-orange-800 px-3 py-1.5 rounded transition-colors font-bold flex items-center gap-1"><Plus size={12}/>ドロップ追加</button>
+                <button onClick={() => addDropSet(item.id, set.id)} className="ml-7 text-xs text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-900/30 hover:bg-orange-100 dark:hover:bg-orange-900/50 border border-orange-200 dark:border-orange-800 px-3 py-1.5 rounded transition-colors font-bold flex items-center gap-1"><Plus size={12}/>ドロップ追加</button>
               </div>
             )}
           </div>
@@ -657,13 +746,34 @@ export default function App() {
     try { await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'workouts', postId), { likes: isCurrentlyLiked ? Math.max(0, currentLikes - 1) : currentLikes + 1, likedByMe: !isCurrentlyLiked }, { merge: true }); } catch (e) {}
   };
 
+  const myInfo = accountsInfo[currentUser] || {};
+
   const handleImportWorkout = (post) => {
+    if (myInfo.isTraining && myInfo.currentGymId) {
+       const currentGymName = gyms.find(g => g.id === myInfo.currentGymId)?.name;
+       if (currentGymName !== post.gymName) {
+          alert(`現在 ${currentGymName} でトレーニング中のため、他のジムのメニューはコピーできません。`);
+          return;
+       }
+    }
+
     const newItems = post.items.map(item => ({
       ...item,
       id: generateId(),
-      sets: item.sets.map(set => ({ ...set, id: generateId() }))
+      sets: item.sets.map(set => ({ 
+         ...set, 
+         id: generateId(),
+         dropSets: set.dropSets ? set.dropSets.map(ds => ({ ...ds, id: generateId() })) : [] 
+      }))
     }));
+    
     setDraftWorkoutItems(newItems);
+    
+    if (!myInfo.isTraining) {
+      const gym = gyms.find(g => g.name === post.gymName);
+      if (gym) handleStartTraining(gym.id);
+    }
+    
     setCurrentTab('record');
   };
 
@@ -686,7 +796,6 @@ export default function App() {
   const partnerName = currentUser === '勇太' ? '未来' : '勇太';
   const partnerInfo = accountsInfo[partnerName];
   const partnerIsTraining = partnerInfo?.isTraining || false;
-  const myInfo = accountsInfo[currentUser] || {};
   const isSameGym = Boolean(myInfo.isTraining && partnerIsTraining && myInfo.currentGymId && partnerInfo?.currentGymId && (myInfo.currentGymId === partnerInfo.currentGymId));
   const isDarkMode = myInfo.theme === 'dark';
 
@@ -723,17 +832,17 @@ export default function App() {
         )}
       </header>
 
-      <main className="p-4 max-w-md mx-auto w-full">
+      <main className="p-4 max-w-md mx-auto w-full pb-40">
         {currentTab === 'timeline' && <TimelineView posts={posts} onToggleLike={toggleLike} onImport={handleImportWorkout} currentUser={currentUser} onDelete={handleDeleteWorkout} onEdit={setEditingPost} accountsInfo={accountsInfo} />}
         {currentTab === 'exercises' && <ExercisesView gyms={allGyms} exercises={exercises} />}
         {currentTab === 'record' && <RecordView onStart={handleStartTraining} onPost={handlePostWorkout} onCancel={handleCancelTraining} myInfo={myInfo} gyms={allGyms} exercises={exercises} workoutItems={draftWorkoutItems} setWorkoutItems={setDraftWorkoutItems} />}
-        {currentTab === 'data' && <DataView posts={posts} currentUser={currentUser} partnerName={partnerName} accountsInfo={accountsInfo} onEdit={setEditingPost} onDelete={handleDeleteWorkout} />}
+        {currentTab === 'data' && <DataView posts={posts} currentUser={currentUser} partnerName={partnerName} accountsInfo={accountsInfo} onEdit={setEditingPost} onDelete={handleDeleteWorkout} onImport={handleImportWorkout} />}
         {currentTab === 'friends' && <FriendsView partnerName={partnerName} partnerInfo={partnerInfo} currentUser={currentUser} posts={posts} />}
       </main>
 
       {editingPost && <EditWorkoutModal post={editingPost} gyms={allGyms} exercises={exercises} onClose={() => setEditingPost(null)} onSave={handleUpdateWorkout} />}
 
-      <nav className="fixed bottom-0 w-full bg-white dark:bg-slate-800 border-t border-slate-200 dark:border-slate-700 pb-safe z-30 transition-colors">
+      <nav className="fixed bottom-0 w-full bg-white dark:bg-slate-800 border-t border-slate-200 dark:border-slate-700 pt-1 pb-safe z-30 transition-colors" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 16px)' }}>
         <div className="flex justify-around items-center p-2 max-w-md mx-auto">
           <NavButton icon={<Home size={22} />} label="ホーム" isActive={currentTab === 'timeline'} onClick={() => setCurrentTab('timeline')} />
           <NavButton icon={<Dumbbell size={22} />} label="種目" isActive={currentTab === 'exercises'} onClick={() => setCurrentTab('exercises')} />
@@ -1093,7 +1202,7 @@ function MonthlyReport({ monthDate, posts, userName, accountsInfo }) {
 }
 
 // --- データ画面 (カレンダー・グラフ・レポート) ---
-function DataView({ posts, currentUser, partnerName, accountsInfo, onEdit, onDelete }) {
+function DataView({ posts, currentUser, partnerName, accountsInfo, onEdit, onDelete, onImport }) {
   const myPosts = posts ? posts.filter(p => p.author === currentUser) : [];
   const partnerPosts = posts ? posts.filter(p => p.author === partnerName) : [];
   
@@ -1163,7 +1272,7 @@ function DataView({ posts, currentUser, partnerName, accountsInfo, onEdit, onDel
         <div className="pt-2 animate-in fade-in">
           <h3 className="text-sm font-bold text-slate-500 dark:text-slate-400 mb-4">{selectedDateStr.replace(/-/g, '/')} の記録</h3>
           {selectedPosts.length > 0 ? (
-            selectedPosts.map(post => <WorkoutCard key={post.id} post={post} currentUser={currentUser} accountsInfo={accountsInfo} onEdit={onEdit} onDelete={onDelete} />)
+            selectedPosts.map(post => <WorkoutCard key={post.id} post={post} currentUser={currentUser} accountsInfo={accountsInfo} onEdit={onEdit} onDelete={onDelete} onImport={onImport} />)
           ) : (
              <div className="bg-slate-100 dark:bg-slate-800 p-4 rounded-xl text-center text-slate-400 dark:text-slate-500 text-sm font-bold border border-slate-200 dark:border-slate-700">記録はありません</div>
           )}
@@ -1195,8 +1304,6 @@ function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workou
   const [selectedCategories, setSelectedCategories] = useState([]);
   const [bodyWeight, setBodyWeight] = useState('');
   const [bodyFat, setBodyFat] = useState('');
-
-  const [draggedIndex, setDraggedIndex] = useState(null);
 
   const isTraining = myInfo.isTraining;
   
@@ -1231,6 +1338,19 @@ function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workou
 
   const removeExerciseItem = (itemId) => setWorkoutItems(workoutItems.filter(item => item.id !== itemId));
   
+  const moveItemUp = (index) => {
+    if (index === 0) return;
+    const newItems = [...workoutItems];
+    [newItems[index - 1], newItems[index]] = [newItems[index], newItems[index - 1]];
+    setWorkoutItems(newItems);
+  };
+  const moveItemDown = (index) => {
+    if (index === workoutItems.length - 1) return;
+    const newItems = [...workoutItems];
+    [newItems[index], newItems[index + 1]] = [newItems[index + 1], newItems[index]];
+    setWorkoutItems(newItems);
+  };
+
   const addSet = (itemId) => {
     setWorkoutItems(prev => prev.map(item => {
       if (item.id === itemId) {
@@ -1277,27 +1397,6 @@ function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workou
       })};
     }));
   }
-
-  const handleDragStart = (e, index) => {
-    setDraggedIndex(index);
-    e.dataTransfer.effectAllowed = 'move';
-    if (e.dataTransfer.setData) e.dataTransfer.setData('text/plain', '');
-  };
-
-  const handleDragOver = (e, index) => {
-    e.preventDefault();
-    if (draggedIndex === null || draggedIndex === index) return;
-    const newItems = [...workoutItems];
-    const draggedItem = newItems[draggedIndex];
-    newItems.splice(draggedIndex, 1);
-    newItems.splice(index, 0, draggedItem);
-    setWorkoutItems(newItems);
-    setDraggedIndex(index);
-  };
-
-  const handleDragEnd = () => {
-    setDraggedIndex(null);
-  };
 
   const handleSubmit = async () => {
     const isValid = workoutItems.every(item => {
@@ -1366,18 +1465,19 @@ function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workou
                key={item.id} 
                item={item} 
                index={index}
+               isFirst={index === 0}
+               isLast={index === workoutItems.length - 1}
                availableExercises={availableExercises} 
                updateItem={updateItem} 
-               removeItem={removeExerciseItem} 
+               removeItem={removeExerciseItem}
+               moveItemUp={moveItemUp}
+               moveItemDown={moveItemDown}
                addSet={addSet} 
                removeSet={removeSet} 
                updateSet={updateSetField} 
                addDropSet={addDropSet} 
                removeDropSet={removeDropSet} 
                updateDropSet={updateDropSetField}
-               onDragStart={handleDragStart}
-               onDragOver={handleDragOver}
-               onDragEnd={handleDragEnd}
              />
           ))}
 
@@ -1418,7 +1518,6 @@ function EditWorkoutModal({ post, gyms, exercises, onClose, onSave }) {
   const [editEndTime, setEditEndTime] = useState(formatTimeFromTimestamp(post.endTime || post.timestamp));
   const [editBodyWeight, setEditBodyWeight] = useState(post.bodyWeight || '');
   const [editBodyFat, setEditBodyFat] = useState(post.bodyFat || '');
-  const [draggedIndex, setDraggedIndex] = useState(null);
 
   const availableExercises = exercises.filter(ex => {
     const gym = gyms.find(g => g.name === post.gymName);
@@ -1432,6 +1531,18 @@ function EditWorkoutModal({ post, gyms, exercises, onClose, onSave }) {
     setWorkoutItems([...workoutItems, { id: generateId(), exerciseName: defaultEx.name, weightType: defaultEx.weightType || 'total', category: defaultEx.category || 'その他', isSuperSet: false, isDropSet: false, isForcedReps: false, memo: '', sets: [{ id: generateId(), weight: '', reps: '', lReps: '', rReps: '' }] }]);
   };
   const removeExerciseItem = (itemId) => setWorkoutItems(workoutItems.filter(item => item.id !== itemId));
+  const moveItemUp = (index) => {
+    if (index === 0) return;
+    const newItems = [...workoutItems];
+    [newItems[index - 1], newItems[index]] = [newItems[index], newItems[index - 1]];
+    setWorkoutItems(newItems);
+  };
+  const moveItemDown = (index) => {
+    if (index === workoutItems.length - 1) return;
+    const newItems = [...workoutItems];
+    [newItems[index], newItems[index + 1]] = [newItems[index + 1], newItems[index]];
+    setWorkoutItems(newItems);
+  };
   const addSet = (itemId) => { setWorkoutItems(prev => prev.map(item => { if (item.id === itemId) { const lastSet = (item.sets && item.sets.length > 0) ? item.sets[item.sets.length - 1] : { weight: '', reps: '', lReps: '', rReps: '' }; return { ...item, sets: [...(item.sets || []), { id: generateId(), weight: lastSet.weight || '', reps: lastSet.reps || '', lReps: lastSet.lReps || '', rReps: lastSet.rReps || '' }]}; } return item; })); };
   const removeSet = (itemId, setId) => setWorkoutItems(prev => prev.map(item => item.id === itemId ? { ...item, sets: (item.sets || []).filter(set => set.id !== setId) } : item));
   const updateSetField = (itemId, setId, field, value) => { setWorkoutItems(prev => prev.map(item => { if (item.id !== itemId) return item; return { ...item, sets: (item.sets || []).map(set => set.id === setId ? { ...set, [field]: value } : set) }; })); };
@@ -1439,10 +1550,6 @@ function EditWorkoutModal({ post, gyms, exercises, onClose, onSave }) {
   const addDropSet = (itemId, parentSetId) => { setWorkoutItems(prev => prev.map(item => { if (item.id !== itemId) return item; return { ...item, sets: item.sets.map(set => { if (set.id !== parentSetId) return set; return { ...set, dropSets: [...(set.dropSets || []), { id: generateId(), weight: '', reps: '', lReps: '', rReps: '' }]}; })}; })); }
   const removeDropSet = (itemId, parentSetId, dropId) => { setWorkoutItems(prev => prev.map(item => { if (item.id !== itemId) return item; return { ...item, sets: item.sets.map(set => { if (set.id !== parentSetId) return set; return { ...set, dropSets: set.dropSets.filter(ds => ds.id !== dropId) }; })}; })); }
   const updateDropSetField = (itemId, parentSetId, dropId, field, value) => { setWorkoutItems(prev => prev.map(item => { if (item.id !== itemId) return item; return { ...item, sets: item.sets.map(set => { if (set.id !== parentSetId) return set; return { ...set, dropSets: set.dropSets.map(ds => ds.id === dropId ? { ...ds, [field]: value } : ds) }; })}; })); }
-
-  const handleDragStart = (e, index) => { setDraggedIndex(index); e.dataTransfer.effectAllowed = 'move'; if(e.dataTransfer.setData) e.dataTransfer.setData('text/plain', ''); };
-  const handleDragOver = (e, index) => { e.preventDefault(); if (draggedIndex === null || draggedIndex === index) return; const newItems = [...workoutItems]; const draggedItem = newItems[draggedIndex]; newItems.splice(draggedIndex, 1); newItems.splice(index, 0, draggedItem); setWorkoutItems(newItems); setDraggedIndex(index); };
-  const handleDragEnd = () => setDraggedIndex(null);
 
   const handleSave = () => {
     const isValid = workoutItems.every(item => {
@@ -1500,18 +1607,19 @@ function EditWorkoutModal({ post, gyms, exercises, onClose, onSave }) {
                key={item.id} 
                item={item} 
                index={index}
+               isFirst={index === 0}
+               isLast={index === workoutItems.length - 1}
                availableExercises={availableExercises} 
                updateItem={updateItem} 
-               removeItem={removeExerciseItem} 
+               removeItem={removeExerciseItem}
+               moveItemUp={moveItemUp}
+               moveItemDown={moveItemDown}
                addSet={addSet} 
                removeSet={removeSet} 
                updateSet={updateSetField} 
                addDropSet={addDropSet} 
                removeDropSet={removeDropSet} 
                updateDropSet={updateDropSetField}
-               onDragStart={handleDragStart}
-               onDragOver={handleDragOver}
-               onDragEnd={handleDragEnd}
              />
           ))}
 
@@ -1640,6 +1748,8 @@ function ExercisesView({ gyms, exercises }) {
                           <label className={`text-center py-2 rounded-lg text-sm font-bold border cursor-pointer ${editExWeightType === 'oneSide' ? 'bg-emerald-500 text-white border-emerald-600' : 'bg-white dark:bg-slate-800 border-emerald-200 dark:border-emerald-800 text-slate-600 dark:text-slate-300'}`}><input type="radio" value="oneSide" checked={editExWeightType === 'oneSide'} onChange={(e) => setEditExWeightType(e.target.value)} className="hidden"/>片側 (kg)</label>
                           <label className={`text-center py-2 rounded-lg text-sm font-bold border cursor-pointer ${editExWeightType === 'plate' ? 'bg-emerald-500 text-white border-emerald-600' : 'bg-white dark:bg-slate-800 border-emerald-200 dark:border-emerald-800 text-slate-600 dark:text-slate-300'}`}><input type="radio" value="plate" checked={editExWeightType === 'plate'} onChange={(e) => setEditExWeightType(e.target.value)} className="hidden"/>プレート (枚)</label>
                           <label className={`text-center py-2 rounded-lg text-sm font-bold border cursor-pointer ${editExWeightType === 'lr' ? 'bg-emerald-500 text-white border-emerald-600' : 'bg-white dark:bg-slate-800 border-emerald-200 dark:border-emerald-800 text-slate-600 dark:text-slate-300'}`}><input type="radio" value="lr" checked={editExWeightType === 'lr'} onChange={(e) => setEditExWeightType(e.target.value)} className="hidden"/>片側種目 (左右別)</label>
+                          <label className={`text-center py-2 rounded-lg text-sm font-bold border cursor-pointer ${editExWeightType === 'bodyWeight' ? 'bg-emerald-500 text-white border-emerald-600' : 'bg-white dark:bg-slate-800 border-emerald-200 dark:border-emerald-800 text-slate-600 dark:text-slate-300'}`}><input type="radio" value="bodyWeight" checked={editExWeightType === 'bodyWeight'} onChange={(e) => setEditExWeightType(e.target.value)} className="hidden"/>自重 (+加重)</label>
+                          <label className={`text-center py-2 rounded-lg text-sm font-bold border cursor-pointer ${editExWeightType === 'assist' ? 'bg-emerald-500 text-white border-emerald-600' : 'bg-white dark:bg-slate-800 border-emerald-200 dark:border-emerald-800 text-slate-600 dark:text-slate-300'}`}><input type="radio" value="assist" checked={editExWeightType === 'assist'} onChange={(e) => setEditExWeightType(e.target.value)} className="hidden"/>アシスト</label>
                        </div>
                     </div>
                     <button type="submit" disabled={!editExName.trim()} className="w-full bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold py-3 rounded-xl mt-2 transition-colors disabled:opacity-50 shadow-md">更新して保存</button>
@@ -1676,6 +1786,8 @@ function ExercisesView({ gyms, exercises }) {
                           <label className={`text-center py-2 rounded-lg text-sm font-bold border cursor-pointer ${newExWeightType === 'oneSide' ? 'bg-emerald-50 dark:bg-emerald-900/30 border-emerald-500 text-emerald-600 dark:text-emerald-400' : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'}`}><input type="radio" value="oneSide" checked={newExWeightType === 'oneSide'} onChange={(e) => setNewExWeightType(e.target.value)} className="hidden"/>片側 (kg)</label>
                           <label className={`text-center py-2 rounded-lg text-sm font-bold border cursor-pointer ${newExWeightType === 'plate' ? 'bg-emerald-50 dark:bg-emerald-900/30 border-emerald-500 text-emerald-600 dark:text-emerald-400' : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'}`}><input type="radio" value="plate" checked={newExWeightType === 'plate'} onChange={(e) => setNewExWeightType(e.target.value)} className="hidden"/>プレート (枚)</label>
                           <label className={`text-center py-2 rounded-lg text-sm font-bold border cursor-pointer ${newExWeightType === 'lr' ? 'bg-emerald-50 dark:bg-emerald-900/30 border-emerald-500 text-emerald-600 dark:text-emerald-400' : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'}`}><input type="radio" value="lr" checked={newExWeightType === 'lr'} onChange={(e) => setNewExWeightType(e.target.value)} className="hidden"/>片側種目 (左右別)</label>
+                          <label className={`text-center py-2 rounded-lg text-sm font-bold border cursor-pointer ${newExWeightType === 'bodyWeight' ? 'bg-emerald-50 dark:bg-emerald-900/30 border-emerald-500 text-emerald-600 dark:text-emerald-400' : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'}`}><input type="radio" value="bodyWeight" checked={newExWeightType === 'bodyWeight'} onChange={(e) => setNewExWeightType(e.target.value)} className="hidden"/>自重 (+加重)</label>
+                          <label className={`text-center py-2 rounded-lg text-sm font-bold border cursor-pointer ${newExWeightType === 'assist' ? 'bg-emerald-50 dark:bg-emerald-900/30 border-emerald-500 text-emerald-600 dark:text-emerald-400' : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'}`}><input type="radio" value="assist" checked={newExWeightType === 'assist'} onChange={(e) => setNewExWeightType(e.target.value)} className="hidden"/>アシスト</label>
                        </div>
                     </div>
                     <button type="submit" disabled={isAdding || !newExName.trim()} className="w-full bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-bold py-3 rounded-xl mt-2 transition-colors disabled:opacity-50">リストに追加</button>
@@ -1699,7 +1811,9 @@ function ExercisesView({ gyms, exercises }) {
                                 <p className="font-bold text-slate-800 dark:text-slate-100 text-sm flex items-center gap-2">{ex.name}{ex.category && <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${getCategoryColor(ex.category)}`}>{ex.category}</span>}</p>
                                 <div className="flex gap-2 mt-1">
                                   {ex.maker && <span className="text-xs text-slate-400 dark:text-slate-500 font-bold bg-slate-100 dark:bg-slate-700 px-1.5 py-0.5 rounded">{ex.maker}</span>}
-                                  {ex.weightType && <span className="text-[10px] text-emerald-500 dark:text-emerald-400 font-bold bg-emerald-50 dark:bg-emerald-900/30 px-1.5 py-0.5 rounded border border-emerald-100 dark:border-emerald-800">{ex.weightType === 'oneSide' ? '片側(kg)' : ex.weightType === 'plate' ? 'プレート(枚)' : ex.weightType === 'lr' ? '片側種目' : '合計(kg)'}</span>}
+                                  {ex.weightType && <span className="text-[10px] text-emerald-500 dark:text-emerald-400 font-bold bg-emerald-50 dark:bg-emerald-900/30 px-1.5 py-0.5 rounded border border-emerald-100 dark:border-emerald-800">
+                                    {ex.weightType === 'oneSide' ? '片側(kg)' : ex.weightType === 'plate' ? 'プレート(枚)' : ex.weightType === 'lr' ? '片側種目' : ex.weightType === 'bodyWeight' ? '自重' : ex.weightType === 'assist' ? 'アシスト' : '合計(kg)'}
+                                  </span>}
                                 </div>
                               </div>
                               <div className="flex gap-1">
