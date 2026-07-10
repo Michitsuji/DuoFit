@@ -1993,7 +1993,7 @@ function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workou
                setManualStartTime(`${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`);
                setIsMetricsOnlyMode(true); 
             }} className="w-full py-3 rounded-xl font-bold text-indigo-600 bg-indigo-50 dark:bg-indigo-950/50 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800 flex flex-col items-center justify-center gap-1 hover:bg-indigo-100 dark:hover:bg-indigo-900 transition-all">
-              <Scale size={18} /> 体重・体脂肪率を記録
+              <Scale size={18} /> 体組成のみ記録
             </button>
           </div>
 
