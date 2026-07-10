@@ -1852,7 +1852,7 @@ function ExercisesView({ gyms, exercises }) {
                                 <div className="flex gap-2 mt-1">
                                   {ex.maker && <span className="text-xs text-slate-400 dark:text-slate-500 font-bold bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded">{ex.maker}</span>}
                                   {ex.weightType && <span className="text-[10px] text-emerald-500 dark:text-emerald-400 font-bold bg-emerald-50 dark:bg-emerald-950/50 px-1.5 py-0.5 rounded border border-emerald-100 dark:border-emerald-900">
-                                    {ex.weightType === 'oneSide' ? '片側(kg)' : ex.weightType === 'plate' ? 'プレートロード(枚)' : ex.weightType === 'lr' ? '片側種目' : ex.weightType === 'bodyWeight' ? '自重/アシスト' : '合計(kg)'}
+                                    {ex.weightType === 'oneSide' ? '片側(kg)' : ex.weightType === 'plate' ? 'プレートロード(枚)' : ex.weightType === 'lr' ? '片側種目' : ex.weightType === 'bodyWeight' ? '加重/アシスト' : '合計(kg)'}
                                   </span>}
                                 </div>
                               </div>
