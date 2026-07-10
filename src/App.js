@@ -530,7 +530,7 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
           </button>
         )}
         
-        {onImport && (
+        {onImport && post.items && post.items.length > 0 && (
           <div className="relative">
             {!showImportOptions ? (
               <button onClick={() => setShowImportOptions(true)} className="flex items-center gap-1.5 text-xs font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/50 px-3 py-2 rounded-lg hover:bg-emerald-100 dark:hover:bg-emerald-900/80 transition-colors border border-emerald-100 dark:border-emerald-900">
@@ -1024,7 +1024,11 @@ export default function App() {
         }
     });
 
-    const { processedItems, totalVolume, totalCalories } = calculateWorkoutTotals(workoutItems, duration, bodyWeight || myInfo?.weight);
+    // 種目がない場合はカロリーとボリュームを0にする
+    const { processedItems, totalVolume, totalCalories } = (!workoutItems || workoutItems.length === 0) 
+        ? { processedItems: [], totalVolume: 0, totalCalories: 0 }
+        : calculateWorkoutTotals(workoutItems, duration, bodyWeight || myInfo?.weight);
+        
     const totalSets = processedItems.reduce((acc, it) => acc + (it.sets?.length || 0), 0);
 
     const newDocId = `workout_${generateId()}`;
