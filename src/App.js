@@ -31,7 +31,7 @@ try {
   console.error("Firebase initialization error:", error);
 }
 
-const MUSCLE_CATEGORIES = ['胸', '背中', '肩', '腕', '脚', 'その他', '有酸素'];
+const MUSCLE_CATEGORIES = ['胸', '背中', '肩', '腕', '脚', '腹筋', 'その他', '有酸素'];
 
 // --- カラーユーティリティ ---
 const getCategoryColor = (category) => {
@@ -41,6 +41,7 @@ const getCategoryColor = (category) => {
     case '肩': return 'bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-400 border border-amber-200 dark:border-amber-900';
     case '腕': return 'bg-purple-100 text-purple-700 dark:bg-purple-950/60 dark:text-purple-400 border border-purple-200 dark:border-purple-900';
     case '脚': return 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900';
+    case '腹筋': return 'bg-lime-100 text-lime-700 dark:bg-lime-950/60 dark:text-lime-400 border border-lime-200 dark:border-lime-900';
     case '有酸素': return 'bg-cyan-100 text-cyan-700 dark:bg-cyan-950/60 dark:text-cyan-400 border border-cyan-200 dark:border-cyan-900';
     default: return 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-400 border border-slate-200 dark:border-slate-700';
   }
@@ -54,6 +55,7 @@ const getCategoryTabColor = (category, isSelected) => {
     case '肩': return 'bg-amber-500 text-white border-amber-500 shadow-sm';
     case '腕': return 'bg-purple-500 text-white border-purple-500 shadow-sm';
     case '脚': return 'bg-emerald-500 text-white border-emerald-500 shadow-sm';
+    case '腹筋': return 'bg-lime-500 text-white border-lime-500 shadow-sm';
     case '有酸素': return 'bg-cyan-500 text-white border-cyan-500 shadow-sm';
     default: return 'bg-slate-600 text-white border-slate-600 shadow-sm';
   }
@@ -1661,12 +1663,12 @@ function DataView({ posts, currentUser, partnerName, accountsInfo, onEdit, onDel
   // ★選択したタブ（自分/相手）の投稿だけを抽出
   const selectedPosts = posts.filter(p => p.author === postsTab && formatDateFromTimestamp(p.timestamp) === selectedDateStr);
 
-  const myInfo = accountsInfo[currentUser] || {};
-  const lastFatPost = myPosts.find(p => p.bodyFat);
-  const compositionInfo = { ...myInfo, lastFat: lastFatPost ? lastFatPost.bodyFat : null };
+  const currentTabUserInfo = accountsInfo[postsTab] || {};
+  const currentTabPosts = postsTab === currentUser ? myPosts : partnerPosts;
+  const lastFatPost = currentTabPosts.find(p => p.bodyFat);
+  const compositionInfo = { ...currentTabUserInfo, lastFat: lastFatPost ? lastFatPost.bodyFat : null };
 
-  const mySelectedPosts = posts.filter(p => p.author === currentUser && formatDateFromTimestamp(p.timestamp) === selectedDateStr);
-  const dailyCalories = mySelectedPosts.reduce((sum, p) => sum + (Number(p.calories) || 0), 0);
+  const dailyCalories = selectedPosts.reduce((sum, p) => sum + (Number(p.calories) || 0), 0);
   const dateLabel = selectedDateStr ? selectedDateStr.substring(5).replace('-', '/') : '';
 
   return (
@@ -2150,6 +2152,8 @@ function ExercisesView({ gyms, exercises }) {
   const [activeTab, setActiveTab] = useState('exercises'); 
   const [newGymName, setNewGymName] = useState('');
   const [selectedGymId, setSelectedGymId] = useState(gyms.length > 0 ? gyms[0].id : '');
+  const [editingGymId, setEditingGymId] = useState(null);
+  const [editGymName, setEditGymName] = useState('');
   const [newExName, setNewExName] = useState('');
   const [newExMaker, setNewExMaker] = useState('');
   const [newExWeightType, setNewExWeightType] = useState('total'); 
@@ -2169,6 +2173,12 @@ function ExercisesView({ gyms, exercises }) {
     const newDocId = `gym_${Date.now()}`;
     try { await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'gyms', newDocId), { name: newGymName.trim(), createdAt: Date.now() }); setNewGymName(''); if (gyms.length === 0) setSelectedGymId(newDocId); } catch (e) {}
     setIsAdding(false);
+  };
+
+  const handleUpdateGym = async (e, gymId) => {
+    e.preventDefault();
+    if (!editGymName.trim()) return;
+    try { await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'gyms', gymId), { name: editGymName.trim() }, { merge: true }); setEditingGymId(null); } catch (e) {}
   };
 
   const handleAddExercise = async (e) => {
@@ -2219,8 +2229,21 @@ function ExercisesView({ gyms, exercises }) {
             <div className="space-y-2">
               {gyms.filter(g => g.id !== 'common').map(gym => (
                 <div key={gym.id} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-3 flex justify-between items-center shadow-sm">
-                  <span className="font-bold text-slate-700 dark:text-slate-200 text-sm">{gym.name}</span>
-                  <button onClick={() => { if(window.confirm(`${gym.name}を削除しますか？`)) handleDelete('gyms', gym.id); }} className="p-2 text-slate-400 hover:text-rose-500 bg-slate-50 dark:bg-slate-800 rounded-lg"><Trash2 size={16} /></button>
+                  {editingGymId === gym.id ? (
+                     <form onSubmit={(e) => handleUpdateGym(e, gym.id)} className="flex-1 flex gap-2 mr-2">
+                        <input type="text" value={editGymName} onChange={(e) => setEditGymName(e.target.value)} className="flex-1 bg-slate-50 dark:bg-slate-950 border border-emerald-200 dark:border-emerald-800 rounded-lg px-2 py-1 text-slate-800 dark:text-slate-100 focus:border-emerald-500 focus:outline-none text-sm" autoFocus />
+                        <button type="submit" className="text-xs bg-emerald-500 text-white px-3 rounded-lg font-bold shadow-sm">保存</button>
+                        <button type="button" onClick={() => setEditingGymId(null)} className="text-xs bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 px-3 rounded-lg font-bold shadow-sm">取消</button>
+                     </form>
+                  ) : (
+                     <>
+                        <span className="font-bold text-slate-700 dark:text-slate-200 text-sm">{gym.name}</span>
+                        <div className="flex gap-1">
+                           <button onClick={() => { setEditingGymId(gym.id); setEditGymName(gym.name); }} className="p-2 text-slate-400 hover:text-emerald-500 bg-slate-50 dark:bg-slate-800 rounded-lg transition-colors"><Edit2 size={16} /></button>
+                           <button onClick={() => { if(window.confirm(`${gym.name}を削除しますか？`)) handleDelete('gyms', gym.id); }} className="p-2 text-slate-400 hover:text-rose-500 bg-slate-50 dark:bg-slate-800 rounded-lg transition-colors"><Trash2 size={16} /></button>
+                        </div>
+                     </>
+                  )}
                 </div>
               ))}
             </div>
