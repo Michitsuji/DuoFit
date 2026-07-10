@@ -1938,13 +1938,13 @@ function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workou
        <div className="space-y-6 animate-in fade-in duration-300">
           <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-2">体重・体脂肪率を記録</h2>
           <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm space-y-4">
-             <div>
+             <div className="min-w-0 overflow-hidden w-full">
                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">日付</label>
-               <input type="date" value={manualDate} onChange={e => setManualDate(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-slate-800 dark:text-slate-100 font-bold focus:outline-none focus:border-emerald-500" style={{ fontSize: '16px' }} />
+               <input type="date" value={manualDate} onChange={e => setManualDate(e.target.value)} className="w-full max-w-full min-w-0 block appearance-none bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-2 sm:px-3 py-2 text-slate-800 dark:text-slate-100 font-bold focus:outline-none focus:border-emerald-500 box-border" style={{ fontSize: '16px' }} />
              </div>
-             <div>
+             <div className="min-w-0 overflow-hidden w-full">
                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">時間</label>
-               <input type="time" value={manualStartTime} onChange={e => setManualStartTime(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-slate-800 dark:text-slate-100 font-bold focus:outline-none focus:border-emerald-500" style={{ fontSize: '16px' }} />
+               <input type="time" value={manualStartTime} onChange={e => setManualStartTime(e.target.value)} className="w-full max-w-full min-w-0 block appearance-none bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-2 sm:px-3 py-2 text-slate-800 dark:text-slate-100 font-bold focus:outline-none focus:border-emerald-500 box-border" style={{ fontSize: '16px' }} />
              </div>
              <div className="flex gap-4 pt-2">
                <div className="flex-1 relative">
@@ -2025,18 +2025,18 @@ function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workou
                <div className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">▼</div>
              </div>
            </div>
-           <div>
+           <div className="min-w-0 overflow-hidden w-full">
              <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">日付</label>
-             <input type="date" value={manualDate} onChange={e => setManualDate(e.target.value)} className="w-full min-w-0 block appearance-none bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-2 sm:px-3 py-2 text-slate-800 dark:text-slate-100 font-bold focus:outline-none focus:border-emerald-500" style={{ fontSize: '16px' }} />
+             <input type="date" value={manualDate} onChange={e => setManualDate(e.target.value)} className="w-full max-w-full min-w-0 block appearance-none bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-2 sm:px-3 py-2 text-slate-800 dark:text-slate-100 font-bold focus:outline-none focus:border-emerald-500 box-border" style={{ fontSize: '16px' }} />
            </div>
-           <div className="flex gap-2 sm:gap-3">
+           <div className="flex gap-2 sm:gap-3 w-full">
              <div className="flex-1 min-w-0 overflow-hidden">
                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">開始時間</label>
-               <input type="time" value={manualStartTime} onChange={e => setManualStartTime(e.target.value)} className="w-full min-w-0 block appearance-none bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-1 sm:px-3 py-2 text-slate-800 dark:text-slate-100 font-bold focus:outline-none focus:border-emerald-500" style={{ fontSize: '16px' }} />
+               <input type="time" value={manualStartTime} onChange={e => setManualStartTime(e.target.value)} className="w-full max-w-full min-w-0 block appearance-none bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-1 sm:px-3 py-2 text-slate-800 dark:text-slate-100 font-bold focus:outline-none focus:border-emerald-500 box-border" style={{ fontSize: '16px' }} />
              </div>
              <div className="flex-1 min-w-0 overflow-hidden">
                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">終了時間</label>
-               <input type="time" value={manualEndTime} onChange={e => setManualEndTime(e.target.value)} className="w-full min-w-0 block appearance-none bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-1 sm:px-3 py-2 text-slate-800 dark:text-slate-100 font-bold focus:outline-none focus:border-emerald-500" style={{ fontSize: '16px' }} />
+               <input type="time" value={manualEndTime} onChange={e => setManualEndTime(e.target.value)} className="w-full max-w-full min-w-0 block appearance-none bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-1 sm:px-3 py-2 text-slate-800 dark:text-slate-100 font-bold focus:outline-none focus:border-emerald-500 box-border" style={{ fontSize: '16px' }} />
              </div>
            </div>
         </div>
@@ -2190,19 +2190,19 @@ function EditWorkoutModal({ post, gyms, exercises, onClose, onSave, myPastPosts 
             </h3>
             
             <div className="space-y-4">
-              <div>
+              <div className="min-w-0 overflow-hidden w-full">
                 <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">日付</label>
-                <input type="date" value={editDate} onChange={e => setEditDate(e.target.value)} className="w-full min-w-0 block appearance-none bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-2 py-2 text-base font-bold text-slate-700 dark:text-slate-100 focus:outline-none focus:border-emerald-500" style={{ fontSize: '16px' }} />
+                <input type="date" value={editDate} onChange={e => setEditDate(e.target.value)} className="w-full max-w-full min-w-0 block appearance-none bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-2 sm:px-3 py-2 text-base font-bold text-slate-700 dark:text-slate-100 focus:outline-none focus:border-emerald-500 box-border" style={{ fontSize: '16px' }} />
               </div>
               
-              <div className="flex gap-2 sm:gap-3">
+              <div className="flex gap-2 sm:gap-3 w-full">
                 <div className="flex-1 min-w-0 overflow-hidden">
                   <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">開始</label>
-                  <input type="time" value={editStartTime} onChange={e => setEditStartTime(e.target.value)} className="w-full min-w-0 block appearance-none bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-1 sm:px-2 py-2 text-base font-bold text-slate-700 dark:text-slate-100 focus:outline-none focus:border-emerald-500" style={{ fontSize: '16px' }} />
+                  <input type="time" value={editStartTime} onChange={e => setEditStartTime(e.target.value)} className="w-full max-w-full min-w-0 block appearance-none bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-1 sm:px-2 py-2 text-base font-bold text-slate-700 dark:text-slate-100 focus:outline-none focus:border-emerald-500 box-border" style={{ fontSize: '16px' }} />
                 </div>
                 <div className="flex-1 min-w-0 overflow-hidden">
                   <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">終了</label>
-                  <input type="time" value={editEndTime} onChange={e => setEditEndTime(e.target.value)} className="w-full min-w-0 block appearance-none bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-1 sm:px-2 py-2 text-base font-bold text-slate-700 dark:text-slate-100 focus:outline-none focus:border-emerald-500" style={{ fontSize: '16px' }} />
+                  <input type="time" value={editEndTime} onChange={e => setEditEndTime(e.target.value)} className="w-full max-w-full min-w-0 block appearance-none bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-1 sm:px-2 py-2 text-base font-bold text-slate-700 dark:text-slate-100 focus:outline-none focus:border-emerald-500 box-border" style={{ fontSize: '16px' }} />
                 </div>
               </div>
 
