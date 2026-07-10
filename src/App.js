@@ -1611,30 +1611,30 @@ function EditWorkoutModal({ post, gyms, exercises, onClose, onSave }) {
               {/* 1段目: 日付（横幅いっぱい） */}
               <div>
                 <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">日付</label>
-                <input type="date" value={editDate} onChange={e => setEditDate(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-2 text-base font-bold text-slate-700 dark:text-slate-100 focus:outline-none focus:border-emerald-500" style={{ fontSize: '16px' }} />
+                <input type="date" value={editDate} onChange={e => setEditDate(e.target.value)} className="w-full min-w-0 block appearance-none bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-2 py-2 text-base font-bold text-slate-700 dark:text-slate-100 focus:outline-none focus:border-emerald-500" style={{ fontSize: '16px' }} />
               </div>
               
               {/* 2段目: 開始と終了（絶対に横並び） */}
-              <div className="flex gap-3">
-                <div className="flex-1 min-w-0">
+              <div className="flex gap-2 sm:gap-3">
+                <div className="flex-1 min-w-0 overflow-hidden">
                   <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">開始</label>
-                  <input type="time" value={editStartTime} onChange={e => setEditStartTime(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-2 py-2 text-base font-bold text-slate-700 dark:text-slate-100 focus:outline-none focus:border-emerald-500" style={{ fontSize: '16px' }} />
+                  <input type="time" value={editStartTime} onChange={e => setEditStartTime(e.target.value)} className="w-full min-w-0 block appearance-none bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-1 sm:px-2 py-2 text-base font-bold text-slate-700 dark:text-slate-100 focus:outline-none focus:border-emerald-500" style={{ fontSize: '16px' }} />
                 </div>
-                <div className="flex-1 min-w-0">
+                <div className="flex-1 min-w-0 overflow-hidden">
                   <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">終了</label>
-                  <input type="time" value={editEndTime} onChange={e => setEditEndTime(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-2 py-2 text-base font-bold text-slate-700 dark:text-slate-100 focus:outline-none focus:border-emerald-500" style={{ fontSize: '16px' }} />
+                  <input type="time" value={editEndTime} onChange={e => setEditEndTime(e.target.value)} className="w-full min-w-0 block appearance-none bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-1 sm:px-2 py-2 text-base font-bold text-slate-700 dark:text-slate-100 focus:outline-none focus:border-emerald-500" style={{ fontSize: '16px' }} />
                 </div>
               </div>
 
               {/* 3段目: 体重と体脂肪率（絶対に横並び） */}
-              <div className="flex gap-3">
-                <div className="flex-1 min-w-0">
+              <div className="flex gap-2 sm:gap-3">
+                <div className="flex-1 min-w-0 overflow-hidden">
                   <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">体重 (kg)</label>
-                  <input type="number" step="0.1" value={editBodyWeight} onChange={e => setEditBodyWeight(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-2 text-base font-bold text-slate-700 dark:text-slate-100 focus:outline-none focus:border-emerald-500" style={{ fontSize: '16px' }} />
+                  <input type="number" step="0.1" value={editBodyWeight} onChange={e => setEditBodyWeight(e.target.value)} className="w-full min-w-0 block appearance-none bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-2 sm:px-3 py-2 text-base font-bold text-slate-700 dark:text-slate-100 focus:outline-none focus:border-emerald-500" style={{ fontSize: '16px' }} />
                 </div>
-                <div className="flex-1 min-w-0">
+                <div className="flex-1 min-w-0 overflow-hidden">
                   <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">体脂肪率 (%)</label>
-                  <input type="number" step="0.1" value={editBodyFat} onChange={e => setEditBodyFat(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-2 text-base font-bold text-slate-700 dark:text-slate-100 focus:outline-none focus:border-emerald-500" style={{ fontSize: '16px' }} />
+                  <input type="number" step="0.1" value={editBodyFat} onChange={e => setEditBodyFat(e.target.value)} className="w-full min-w-0 block appearance-none bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-2 sm:px-3 py-2 text-base font-bold text-slate-700 dark:text-slate-100 focus:outline-none focus:border-emerald-500" style={{ fontSize: '16px' }} />
                 </div>
               </div>
             </div>
@@ -1986,8 +1986,14 @@ function FriendsView({ partnerName, partnerInfo, currentUser, posts }) {
          <SimpleChart data={weightData} color="#10b981" title="体重の推移 (kg)" />
          <SimpleChart data={fatData} color="#6366f1" title="体脂肪率の推移 (%)" />
       </div>
+
+      <div className="mt-12 text-center pb-4 border-t border-slate-200/50 dark:border-slate-800/50 pt-6">
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">DuoFit v1.0.0</p>
+        <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 mt-1">© 2026 Yuta Michitsuji. All rights reserved.</p>
+      </div>
     </div>
   );
+  
 }
 
 // --- ナビゲーションボタン ---
