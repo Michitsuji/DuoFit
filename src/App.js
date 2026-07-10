@@ -588,17 +588,19 @@ function WorkoutItemForm({ item, index, isFirst, isLast, availableExercises, upd
        const targetExName = type === 'super2' ? item.superExerciseName : type === 'super3' ? item.superExerciseName3 : item.exerciseName;
        if (targetExName) {
          for (let p of myPastPosts) {
+           let foundSet = null;
+           let pastType = null;
            const foundItem = p.items?.find(i => {
-              if (type === 'main') return i.exerciseName === targetExName;
-              if (type === 'super2') return i.superExerciseName === targetExName;
-              if (type === 'super3') return i.superExerciseName3 === targetExName;
+              if (i.exerciseName === targetExName) { pastType = 'main'; return true; }
+              if (i.isSuperSet && i.superExerciseName === targetExName) { pastType = 'super2'; return true; }
+              if (i.isSuperSet && i.superExerciseName3 === targetExName) { pastType = 'super3'; return true; }
               return false;
            });
-           if (foundItem && foundItem.sets) {
-              let foundSet = null;
+           
+           if (foundItem && foundItem.sets && pastType) {
               for (let s of foundItem.sets) {
                  const checkSet = (checkS) => {
-                    const w = type === 'super2' ? checkS.superWeight : type === 'super3' ? checkS.superWeight3 : checkS.weight;
+                    const w = pastType === 'super2' ? checkS.superWeight : pastType === 'super3' ? checkS.superWeight3 : checkS.weight;
                     if (String(w) === String(currentWeight) && w !== '' && w !== undefined) {
                        foundSet = checkS;
                        return true;
@@ -616,11 +618,11 @@ function WorkoutItemForm({ item, index, isFirst, isLast, availableExercises, upd
               if (foundSet) {
                  const pDate = p.date ? p.date.substring(5).replace('-','/') : '';
                  if (wType === 'lr') {
-                    const l = type === 'super2' ? foundSet.superLReps : type === 'super3' ? foundSet.superLReps3 : foundSet.lReps;
-                    const r = type === 'super2' ? foundSet.superRReps : type === 'super3' ? foundSet.superRReps3 : foundSet.rReps;
+                    const l = pastType === 'super2' ? foundSet.superLReps : pastType === 'super3' ? foundSet.superLReps3 : foundSet.lReps;
+                    const r = pastType === 'super2' ? foundSet.superRReps : pastType === 'super3' ? foundSet.superRReps3 : foundSet.rReps;
                     prevRecordText = `前回(${pDate}): L${l||0}/R${r||0}回`;
                  } else {
-                    const r = type === 'super2' ? foundSet.superReps : type === 'super3' ? foundSet.superReps3 : foundSet.reps;
+                    const r = pastType === 'super2' ? foundSet.superReps : pastType === 'super3' ? foundSet.superReps3 : foundSet.reps;
                     prevRecordText = `前回(${pDate}): ${r||0}回`;
                  }
                  break;
@@ -845,6 +847,33 @@ export default function App() {
   const [draftWorkoutItems, setDraftWorkoutItems] = useState([]);
   const [editingPost, setEditingPost] = useState(null);
   const [showProfileModal, setShowProfileModal] = useState(false);
+
+  useEffect(() => {
+    if (currentUser) {
+      try {
+        const savedDraft = localStorage.getItem(`duofit_draft_${currentUser}`);
+        if (savedDraft) {
+          setDraftWorkoutItems(JSON.parse(savedDraft));
+        }
+      } catch (e) {
+        console.error("Failed to load draft from localStorage", e);
+      }
+    }
+  }, [currentUser]);
+
+  useEffect(() => {
+    if (currentUser) {
+      try {
+        if (draftWorkoutItems.length > 0) {
+          localStorage.setItem(`duofit_draft_${currentUser}`, JSON.stringify(draftWorkoutItems));
+        } else {
+          localStorage.removeItem(`duofit_draft_${currentUser}`);
+        }
+      } catch (e) {
+        console.error("Failed to save draft to localStorage", e);
+      }
+    }
+  }, [draftWorkoutItems, currentUser]);
 
   useEffect(() => {
     const handleOnline = () => setIsOnline(true);
@@ -1105,7 +1134,7 @@ export default function App() {
       <main className="p-4 max-w-md mx-auto w-full pb-40">
         {currentTab === 'timeline' && <TimelineView posts={posts} onToggleLike={toggleLike} onImport={handleImportWorkout} currentUser={currentUser} onDelete={handleDeleteWorkout} onEdit={setEditingPost} accountsInfo={accountsInfo} />}
         {currentTab === 'exercises' && <ExercisesView gyms={allGyms} exercises={exercises} />}
-        {currentTab === 'record' && <RecordView onStart={handleStartTraining} onPost={handlePostWorkout} onCancel={handleCancelTraining} myInfo={myInfo} gyms={allGyms} exercises={exercises} workoutItems={draftWorkoutItems} setWorkoutItems={setDraftWorkoutItems} posts={posts} />}
+        {currentTab === 'record' && <RecordView onStart={handleStartTraining} onPost={handlePostWorkout} onCancel={handleCancelTraining} myInfo={myInfo} gyms={allGyms} exercises={exercises} workoutItems={draftWorkoutItems} setWorkoutItems={setDraftWorkoutItems} posts={posts} currentUser={currentUser} />}
         {currentTab === 'data' && <DataView posts={posts} currentUser={currentUser} partnerName={partnerName} accountsInfo={accountsInfo} onEdit={setEditingPost} onDelete={handleDeleteWorkout} onImport={handleImportWorkout} />}
         {currentTab === 'friends' && <FriendsView partnerName={partnerName} partnerInfo={partnerInfo} currentUser={currentUser} posts={posts} accountsInfo={accountsInfo} />}
       </main>
@@ -1654,7 +1683,7 @@ function DataView({ posts, currentUser, partnerName, accountsInfo, onEdit, onDel
 }
 
 // --- 記録入力画面 ---
-function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workoutItems, setWorkoutItems, posts }) {
+function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workoutItems, setWorkoutItems, posts, currentUser }) {
   const [selectedGymId, setSelectedGymId] = useState(myInfo.currentGymId || (gyms.filter(g => g.id !== 'common')[0]?.id || ''));
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedCategories, setSelectedCategories] = useState([]);
@@ -1668,7 +1697,6 @@ function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workou
   const [manualEndTime, setManualEndTime] = useState("13:00");
 
   const isTraining = myInfo.isTraining;
-  const currentUser = myInfo.name || myInfo.userId; // 過去の記録PR検索用
   const myPastPosts = posts.filter(p => p.author === currentUser);
 
   const availableExercises = exercises.filter(ex => {
