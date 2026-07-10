@@ -1137,27 +1137,27 @@ function ProfileModal({ isOpen, onClose, userInfo, onSave, currentUser }) {
         </div>
 
         <div className="mt-6 space-y-4">
-          <div className="grid grid-cols-2 gap-3">
-             <div>
+          <div className="grid grid-cols-2 gap-2 sm:gap-3">
+             <div className="min-w-0 overflow-hidden">
                 <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">性別</label>
-                <select value={gender} onChange={e => setGender(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl p-2 text-sm text-slate-800 dark:text-slate-100 font-bold focus:outline-none focus:border-emerald-500">
+                <select value={gender} onChange={e => setGender(e.target.value)} className="w-full min-w-0 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl px-2 py-2 text-sm text-slate-800 dark:text-slate-100 font-bold focus:outline-none focus:border-emerald-500" style={{ fontSize: '16px' }}>
                    <option value="male">男性</option>
                    <option value="female">女性</option>
                 </select>
              </div>
-             <div>
+             <div className="min-w-0 overflow-hidden">
                 <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">生年月日</label>
-                <input type="date" value={birthDate} onChange={e => setBirthDate(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl p-2 text-sm text-slate-800 dark:text-slate-100 font-bold focus:outline-none focus:border-emerald-500" />
+                <input type="date" value={birthDate} onChange={e => setBirthDate(e.target.value)} className="w-full min-w-0 block appearance-none bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl px-2 py-2 text-sm text-slate-800 dark:text-slate-100 font-bold focus:outline-none focus:border-emerald-500" style={{ fontSize: '16px' }} />
              </div>
           </div>
-          <div className="grid grid-cols-2 gap-3">
-             <div>
+          <div className="grid grid-cols-2 gap-2 sm:gap-3">
+             <div className="min-w-0 overflow-hidden">
                 <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">身長 (cm)</label>
-                <input type="number" inputMode="decimal" value={height} onChange={e => setHeight(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl p-2 text-sm text-slate-800 dark:text-slate-100 font-bold focus:outline-none focus:border-emerald-500" placeholder="例: 170" />
+                <input type="number" inputMode="decimal" value={height} onChange={e => setHeight(e.target.value)} className="w-full min-w-0 block appearance-none bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl px-2 py-2 text-sm text-slate-800 dark:text-slate-100 font-bold focus:outline-none focus:border-emerald-500" placeholder="例: 170" style={{ fontSize: '16px' }} />
              </div>
-             <div>
+             <div className="min-w-0 overflow-hidden">
                 <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">基本体重 (kg)</label>
-                <input type="number" inputMode="decimal" step="0.1" value={weight} onChange={e => setWeight(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl p-2 text-sm text-slate-800 dark:text-slate-100 font-bold focus:outline-none focus:border-emerald-500" placeholder="記録時の初期値" />
+                <input type="number" inputMode="decimal" step="0.1" value={weight} onChange={e => setWeight(e.target.value)} className="w-full min-w-0 block appearance-none bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl px-2 py-2 text-sm text-slate-800 dark:text-slate-100 font-bold focus:outline-none focus:border-emerald-500" placeholder="記録時の初期値" style={{ fontSize: '16px' }} />
              </div>
           </div>
 
@@ -1546,11 +1546,7 @@ function DataView({ posts, currentUser, partnerName, accountsInfo, onEdit, onDel
 
       <div>
         <h3 className="text-lg font-bold text-slate-900 dark:text-white mt-8 mb-4">月間レポート ({month + 1}月)</h3>
-        <div className="flex bg-slate-200 dark:bg-slate-800 p-1 rounded-xl mb-6">
-          <button onClick={() => setReportTab(currentUser)} className={`flex-1 py-2 text-sm font-bold text-center rounded-lg transition-colors ${reportTab === currentUser ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'}`}>{currentUser}</button>
-          <button onClick={() => setReportTab(partnerName)} className={`flex-1 py-2 text-sm font-bold text-center rounded-lg transition-colors ${reportTab === partnerName ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'}`}>{partnerName}</button>
-        </div>
-        <MonthlyReport monthDate={currentMonth} posts={posts} userName={reportTab} accountsInfo={accountsInfo} />
+        <MonthlyReport monthDate={currentMonth} posts={posts} userName={currentUser} accountsInfo={accountsInfo} />
       </div>
 
       <div className="space-y-6 pt-8">
@@ -2285,7 +2281,18 @@ function FriendsView({ partnerName, partnerInfo, currentUser, posts }) {
          </div>
       </div>
 
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 mt-4 shadow-sm">
+      <div className="mt-8">
+         <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4">{partnerName}の月間レポート ({currentMonth + 1}月)</h3>
+         <MonthlyReport monthDate={new Date(currentYear, currentMonth, 1)} posts={posts} userName={partnerName} accountsInfo={accountsInfo} />
+      </div>
+
+      <div className="space-y-6 pt-8">
+         <h3 className="text-lg font-bold text-slate-800 dark:text-white">{partnerName}のデータ</h3>
+         <SimpleChart data={weightData} color="#10b981" title="体重の推移 (kg)" />
+         <SimpleChart data={fatData} color="#6366f1" title="体脂肪率の推移 (%)" />
+      </div>
+
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 mt-8 shadow-sm">
         <h3 className="text-slate-700 dark:text-slate-300 font-bold mb-3 text-sm">システムステータス</h3>
         <ul className="space-y-3 text-sm font-bold">
           <li className="flex items-center justify-between">
@@ -2299,12 +2306,6 @@ function FriendsView({ partnerName, partnerInfo, currentUser, posts }) {
             <a href={`https://console.firebase.google.com/project/${FIREBASE_PROJECT_ID}/firestore/data`} target="_blank" rel="noreferrer" className="text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 text-xs bg-emerald-50 dark:bg-emerald-950/50 hover:bg-emerald-100 dark:hover:bg-emerald-900 border border-emerald-100 dark:border-emerald-800 px-2 py-1 rounded-md transition-colors">Firestore データを確認</a>
           </li>
         </ul>
-      </div>
-
-      <div className="space-y-6 pt-4">
-         <h3 className="text-lg font-bold text-slate-800 dark:text-white">{partnerName}のデータ</h3>
-         <SimpleChart data={weightData} color="#10b981" title="体重の推移 (kg)" />
-         <SimpleChart data={fatData} color="#6366f1" title="体脂肪率の推移 (%)" />
       </div>
 
       <div className="mt-12 text-center pb-4 border-t border-slate-200/50 dark:border-slate-800/50 pt-6">
