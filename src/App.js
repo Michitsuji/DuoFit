@@ -898,11 +898,11 @@ export default function App() {
 
     const newDocId = `workout_${generateId()}`;
     try {
-      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'workouts', newDocId), {
+      setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'workouts', newDocId), {
         author: currentUser, gymName, items: processedItems, timestamp: timestamp, startTime, endTime, duration, date: dateIso, likes: 0, likedByMe: false, bodyWeight: bodyWeight || null, bodyFat: bodyFat || null, volume: totalVolume, calories: totalCalories, totalSets: totalSets
       });
       if (!manualStart) {
-        await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), { isTraining: false, trainingStartTime: null, currentGymId: null, currentExerciseName: '', lastActive: Date.now() }, { merge: true });
+        setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), { isTraining: false, trainingStartTime: null, currentGymId: null, currentExerciseName: '', lastActive: Date.now() }, { merge: true });
       }
       setDraftWorkoutItems([]); setCurrentTab('timeline');
     } catch (e) {}
