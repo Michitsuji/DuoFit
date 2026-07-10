@@ -647,10 +647,10 @@ function WorkoutItemForm({ item, index, isFirst, isLast, availableExercises, upd
                  if (wType === 'lr') {
                     const l = pastType === 'super2' ? foundSet.superLReps : pastType === 'super3' ? foundSet.superLReps3 : foundSet.lReps;
                     const r = pastType === 'super2' ? foundSet.superRReps : pastType === 'super3' ? foundSet.superRReps3 : foundSet.rReps;
-                    prevRecordText = `前回(${pDate}): L${l||0}/R${r||0}回`;
+                    prevRecordText = `前回${pDate}: L${l||0}/R${r||0}回`;
                  } else {
                     const r = pastType === 'super2' ? foundSet.superReps : pastType === 'super3' ? foundSet.superReps3 : foundSet.reps;
-                    prevRecordText = `前回(${pDate}): ${r||0}回`;
+                    prevRecordText = `前回${pDate}: ${r||0}回`;
                  }
                  break;
               }
@@ -988,7 +988,10 @@ export default function App() {
   };
 
   const handlePostWorkout = async (gymName, workoutItems, bodyWeight, bodyFat, manualStart, manualEnd) => {
-    if (!currentUser || !workoutItems || workoutItems.length === 0 || !db) return;
+    if (!currentUser || !db) return;
+    // 種目が空でも、体重か体脂肪率の入力があれば保存できるように条件を変更
+    if ((!workoutItems || workoutItems.length === 0) && !bodyWeight && !bodyFat) return;
+
     const myInfo = accountsInfo[currentUser];
     
     const startTime = manualStart || myInfo?.trainingStartTime || Date.now();
@@ -1020,6 +1023,21 @@ export default function App() {
             });
         }
     });
+
+    const { processedItems, totalVolume, totalCalories } = calculateWorkoutTotals(workoutItems, duration, bodyWeight || myInfo?.weight);
+    const totalSets = processedItems.reduce((acc, it) => acc + (it.sets?.length || 0), 0);
+
+    const newDocId = `workout_${generateId()}`;
+    try {
+      setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'workouts', newDocId), {
+        author: currentUser, gymName, items: processedItems, timestamp: timestamp, startTime, endTime, duration, date: dateIso, likes: 0, likedByMe: false, bodyWeight: bodyWeight || null, bodyFat: bodyFat || null, volume: totalVolume, calories: totalCalories, totalSets: totalSets
+      });
+      if (!manualStart) {
+        setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), { isTraining: false, trainingStartTime: null, currentGymId: null, currentExerciseName: '', lastActive: Date.now() }, { merge: true });
+      }
+      setDraftWorkoutItems([]); setCurrentTab('timeline');
+    } catch (e) {}
+  };
 
     const { processedItems, totalVolume, totalCalories } = calculateWorkoutTotals(workoutItems, duration, bodyWeight || myInfo?.weight);
     const totalSets = processedItems.reduce((acc, it) => acc + (it.sets?.length || 0), 0);
@@ -1779,6 +1797,9 @@ function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workou
   const [manualStartTime, setManualStartTime] = useState("12:00");
   const [manualEndTime, setManualEndTime] = useState("13:00");
 
+  // 体重・体脂肪率のみ記録モードのステート
+  const [isMetricsOnlyMode, setIsMetricsOnlyMode] = useState(false);
+
   const isTraining = myInfo.isTraining;
   const myPastPosts = posts.filter(p => p.author === currentUser);
 
@@ -1878,13 +1899,18 @@ function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workou
   }
 
   const handleSubmit = async () => {
-    const isValid = workoutItems.every(item => {
-      if (!item.exerciseName || !item.sets || item.sets.length === 0) return false;
-      if (item.weightType === 'cardio') return item.sets.every(set => set.distance !== '' || set.time !== '' || set.calories !== '');
-      if (item.weightType === 'lr') return item.sets.every(set => set.weight !== '' && set.lReps !== '' && set.rReps !== '');
-      return item.sets.every(set => set.weight !== '' && set.reps !== '');
-    });
-    if (!isValid || workoutItems.length === 0) { alert("種目を選択し、すべての入力を完了してください。"); return; }
+    if (workoutItems.length > 0) {
+      const isValid = workoutItems.every(item => {
+        if (!item.exerciseName || !item.sets || item.sets.length === 0) return false;
+        if (item.weightType === 'cardio') return item.sets.every(set => set.distance !== '' || set.time !== '' || set.calories !== '');
+        if (item.weightType === 'lr') return item.sets.every(set => set.weight !== '' && set.lReps !== '' && set.rReps !== '');
+        return item.sets.every(set => set.weight !== '' && set.reps !== '');
+      });
+      if (!isValid) { alert("種目を選択し、すべての入力を完了してください。"); return; }
+    } else if (!bodyWeight && !bodyFat) {
+      alert("種目を追加するか、体重・体脂肪率を入力してください。"); return;
+    }
+
     setIsSubmitting(true);
     const gym = gyms.find(g => g.id === selectedGymId);
     
@@ -1901,14 +1927,57 @@ function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workou
 
   const handleCancel = () => {
       if (isManual) {
-          setWorkoutItems([]); // setDraftWorkoutItems から setWorkoutItems に修正
+          setWorkoutItems([]);
           setIsManual(false);
       } else {
           onCancel();
       }
-    };
+  };
+
+  const handleMetricsOnlySubmit = async () => {
+      if (!bodyWeight && !bodyFat) { alert('体重または体脂肪率を入力してください'); return; }
+      setIsSubmitting(true);
+      const startTs = new Date(`${manualDate}T${manualStartTime}`).getTime();
+      await onPost('', [], Number(bodyWeight), Number(bodyFat), startTs, startTs);
+      setIsSubmitting(false);
+      setIsMetricsOnlyMode(false);
+      setBodyWeight(myInfo.weight || '');
+      setBodyFat('');
+  };
 
   const toggleCategory = (cat) => setSelectedCategories(prev => prev.includes(cat) ? prev.filter(c => c !== cat) : [...prev, cat]);
+
+  if (isMetricsOnlyMode) {
+     return (
+       <div className="space-y-6 animate-in fade-in duration-300">
+          <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-2">体重・体脂肪率を記録</h2>
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm space-y-4">
+             <div>
+               <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">日付</label>
+               <input type="date" value={manualDate} onChange={e => setManualDate(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-slate-800 dark:text-slate-100 font-bold focus:outline-none focus:border-emerald-500" style={{ fontSize: '16px' }} />
+             </div>
+             <div>
+               <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">時間</label>
+               <input type="time" value={manualStartTime} onChange={e => setManualStartTime(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-slate-800 dark:text-slate-100 font-bold focus:outline-none focus:border-emerald-500" style={{ fontSize: '16px' }} />
+             </div>
+             <div className="flex gap-4 pt-2">
+               <div className="flex-1 relative">
+                 <input type="number" inputMode="decimal" step="0.1" value={bodyWeight} onChange={(e) => setBodyWeight(e.target.value)} placeholder="体重" className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl py-2 px-3 text-slate-800 dark:text-slate-100 font-bold focus:outline-none focus:border-emerald-500" style={{ fontSize: '16px' }}/>
+                 <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">kg</span>
+               </div>
+               <div className="flex-1 relative">
+                 <input type="number" inputMode="decimal" step="0.1" value={bodyFat} onChange={(e) => setBodyFat(e.target.value)} placeholder="体脂肪率" className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl py-2 px-3 text-slate-800 dark:text-slate-100 font-bold focus:outline-none focus:border-emerald-500" style={{ fontSize: '16px' }}/>
+                 <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">%</span>
+               </div>
+             </div>
+             <button onClick={handleMetricsOnlySubmit} disabled={isSubmitting || (!bodyWeight && !bodyFat)} className="w-full bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-3 rounded-xl shadow-md mt-6 transition-colors disabled:opacity-50 flex justify-center items-center gap-2">
+               {isSubmitting ? <Activity className="animate-spin" size={20} /> : <><Scale size={18} /> 記録を保存する</>}
+             </button>
+             <button onClick={() => setIsMetricsOnlyMode(false)} className="w-full text-slate-500 dark:text-slate-400 font-bold py-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 mt-2">キャンセル</button>
+          </div>
+       </div>
+     );
+  }
 
   if (!isTraining && !isManual) {
     return (
@@ -1927,9 +1996,21 @@ function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workou
           <button onClick={handleStart} className="w-full py-4 rounded-xl font-bold text-white flex items-center justify-center gap-2 transition-all shadow-md bg-emerald-500 hover:bg-emerald-600 shadow-emerald-500/30 mb-3">
             <Play fill="currentColor" size={20} /> トレーニング開始
           </button>
-          <button onClick={() => {setIsManual(true); if(workoutItems.length === 0) addExerciseItem('');}} className="w-full py-3 rounded-xl font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-950/50 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 flex items-center justify-center gap-2 hover:bg-emerald-100 dark:hover:bg-emerald-900 transition-all">
-            <CalendarIcon size={18} /> 過去の記録を追加
-          </button>
+          
+          <div className="grid grid-cols-2 gap-3 w-full">
+            <button onClick={() => {setIsManual(true); if(workoutItems.length === 0) addExerciseItem('');}} className="w-full py-3 rounded-xl font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-950/50 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 flex flex-col items-center justify-center gap-1 hover:bg-emerald-100 dark:hover:bg-emerald-900 transition-all">
+              <CalendarIcon size={18} /> 過去の記録を追加
+            </button>
+            <button onClick={() => { 
+               const d = new Date();
+               setManualDate(formatDateFromTimestamp(d.getTime()));
+               setManualStartTime(`${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`);
+               setIsMetricsOnlyMode(true); 
+            }} className="w-full py-3 rounded-xl font-bold text-indigo-600 bg-indigo-50 dark:bg-indigo-950/50 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800 flex flex-col items-center justify-center gap-1 hover:bg-indigo-100 dark:hover:bg-indigo-900 transition-all">
+              <Scale size={18} /> 体重・体脂肪率を記録
+            </button>
+          </div>
+
         </div>
       </div>
     );
@@ -2030,8 +2111,8 @@ function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workou
           </div>
         </div>
 
-        <button onClick={handleSubmit} disabled={isSubmitting || workoutItems.length === 0} className={`w-full text-white font-bold py-4 rounded-xl shadow-md flex items-center justify-center gap-2 mt-6 mb-8 transition-all ${isSubmitting || workoutItems.length === 0 ? 'bg-slate-300 dark:bg-slate-800 cursor-not-allowed text-slate-500 dark:text-slate-400' : 'bg-emerald-500 hover:bg-emerald-600 shadow-emerald-500/30'}`}>
-          {isSubmitting ? <Activity className="animate-spin" size={20} /> : <><Flame size={20} /> トレーニングを完了して保存</>}
+        <button onClick={handleSubmit} disabled={isSubmitting || (workoutItems.length === 0 && !bodyWeight && !bodyFat)} className={`w-full text-white font-bold py-4 rounded-xl shadow-md flex items-center justify-center gap-2 mt-6 mb-8 transition-all ${isSubmitting || (workoutItems.length === 0 && !bodyWeight && !bodyFat) ? 'bg-slate-300 dark:bg-slate-800 cursor-not-allowed text-slate-500 dark:text-slate-400' : 'bg-emerald-500 hover:bg-emerald-600 shadow-emerald-500/30'}`}>
+          {isSubmitting ? <Activity className="animate-spin" size={20} /> : (isManual ? <><CalendarIcon size={20} /> 過去の記録を保存</> : <><Flame size={20} /> トレーニングを完了して保存</>)}
         </button>
         
         <button onClick={handleCancel} className="w-full text-slate-500 dark:text-slate-400 font-bold py-3 rounded-xl flex items-center justify-center gap-2 mt-2 mb-8 transition-all bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:bg-rose-50 dark:hover:bg-rose-950/30 hover:text-rose-500 hover:border-rose-200 dark:hover:border-rose-800">記録を破棄して終了</button>
