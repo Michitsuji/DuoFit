@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Heart, Home, PlusCircle, Users, Dumbbell, LogOut, Activity, Flame, Lock, Settings, Trash2, Plus, X, ListPlus, MapPin, Clock, Play, Circle, Edit2, KeyRound, AlignLeft, Scale, Calendar as CalendarIcon, Zap, TrendingDown, Copy, Moon, Sun, Target, Trophy, ArrowUp, ArrowDown } from 'lucide-react';
+import { Heart, Home, PlusCircle, Users, Dumbbell, LogOut, Activity, Flame, Lock, Settings, Trash2, Plus, X, ListPlus, MapPin, Clock, Play, Circle, Edit2, KeyRound, AlignLeft, Scale, Calendar as CalendarIcon, Zap, TrendingDown, Copy, Moon, Sun, Target, Trophy, ArrowUp, ArrowDown, Award } from 'lucide-react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
 import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot, enableIndexedDbPersistence } from 'firebase/firestore';
@@ -31,7 +31,7 @@ try {
   console.error("Firebase initialization error:", error);
 }
 
-const MUSCLE_CATEGORIES = ['胸', '背中', '肩', '腕', '脚', 'その他'];
+const MUSCLE_CATEGORIES = ['胸', '背中', '肩', '腕', '脚', '有酸素', 'その他'];
 
 // --- カラーユーティリティ ---
 const getCategoryColor = (category) => {
@@ -41,6 +41,7 @@ const getCategoryColor = (category) => {
     case '肩': return 'bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-400 border border-amber-200 dark:border-amber-900';
     case '腕': return 'bg-purple-100 text-purple-700 dark:bg-purple-950/60 dark:text-purple-400 border border-purple-200 dark:border-purple-900';
     case '脚': return 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900';
+    case '有酸素': return 'bg-cyan-100 text-cyan-700 dark:bg-cyan-950/60 dark:text-cyan-400 border border-cyan-200 dark:border-cyan-900';
     default: return 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-400 border border-slate-200 dark:border-slate-700';
   }
 };
@@ -53,12 +54,53 @@ const getCategoryTabColor = (category, isSelected) => {
     case '肩': return 'bg-amber-500 text-white border-amber-500 shadow-sm';
     case '腕': return 'bg-purple-500 text-white border-purple-500 shadow-sm';
     case '脚': return 'bg-emerald-500 text-white border-emerald-500 shadow-sm';
+    case '有酸素': return 'bg-cyan-500 text-white border-cyan-500 shadow-sm';
     default: return 'bg-slate-600 text-white border-slate-600 shadow-sm';
   }
 }
 
-// --- ユーティリティ関数 ---
+// --- 計算ユーティリティ ---
 const generateId = () => Date.now().toString() + Math.random().toString(36).substring(2, 9);
+
+const getAge = (birthDateStr) => {
+  if (!birthDateStr) return 0;
+  const today = new Date();
+  const birth = new Date(birthDateStr);
+  let age = today.getFullYear() - birth.getFullYear();
+  const m = today.getMonth() - birth.getMonth();
+  if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--;
+  return age;
+};
+
+const getBMR = (weight, height, age, gender) => {
+  if (!weight || !height || !age) return 0;
+  if (gender === 'female') return Math.round((10 * weight) + (6.25 * height) - (5 * age) - 161);
+  return Math.round((10 * weight) + (6.25 * height) - (5 * age) + 5);
+};
+
+const getFFMI = (weight, fat, height) => {
+  if (!weight || !fat || !height) return 0;
+  const leanWeight = weight * (1 - (fat / 100));
+  const heightM = height / 100;
+  const ffmi = leanWeight / (heightM * heightM);
+  return ffmi + 6.1 * (1.8 - heightM);
+};
+
+const getFFMIEval = (ffmi, gender) => {
+  if (gender === 'female') {
+      if (ffmi < 14) return '低め';
+      if (ffmi < 16) return '平均的';
+      if (ffmi < 18) return '優秀';
+      if (ffmi < 21) return '非常に優秀';
+      return '限界レベル';
+  } else {
+      if (ffmi < 18) return '低め';
+      if (ffmi < 20) return '平均的';
+      if (ffmi < 22) return '優秀';
+      if (ffmi < 25) return '非常に優秀';
+      return '限界レベル';
+  }
+};
 
 function TimerDisplay({ startTime, isStopped = false }) {
   const [elapsed, setElapsed] = useState(startTime ? Math.max(0, Date.now() - startTime) : 0);
@@ -107,55 +149,72 @@ const formatShortDateTime = (timestamp) => {
   return `${date.getMonth() + 1}/${date.getDate()}(${days[date.getDay()]}) ${String(date.getHours()).padStart(2,'0')}:${String(date.getMinutes()).padStart(2, '0')}`;
 };
 
-const calcSetVolume = (weight, reps, lReps, rReps, forcedReps, wType) => {
+const calcSetVolume = (set, wType, userWeight) => {
+  if (wType === 'cardio') return 0;
   let v = 0;
-  const w = Number(weight) || 0;
-  const r = Number(reps) || 0;
-  const l = Number(lReps) || 0;
-  const rR = Number(rReps) || 0;
-  const f = Number(forcedReps) || 0;
+  const w = Number(set.weight) || 0;
+  const r = Number(set.reps) || 0;
+  const l = Number(set.lReps) || 0;
+  const rR = Number(set.rReps) || 0;
+  const f = Number(set.forcedReps) || 0;
 
   if (wType === 'lr') {
-    v += w * l;
-    v += w * rR;
-    v += w * f * 2; 
+    v += w * (l + rR + f * 2); 
   } else if (wType === 'oneSide') {
     v += w * (r + f) * 2;
   } else if (wType === 'plate') {
-    v += w * (r + f) * 5;
+    v += w * (r + f) * 20; 
   } else if (wType === 'bodyWeight') {
-    if (w > 0) {
-      v += w * (r + f); // 加重分のみ総負荷量に加算
-    }
+    const effectiveWeight = (Number(userWeight) || 0) + w;
+    if (effectiveWeight > 0) v += effectiveWeight * (r + f);
   } else {
     v += w * (r + f);
   }
   return v;
 };
 
-const calculateTotalVolume = (items) => {
-  let volume = 0;
-  if (!items || !Array.isArray(items)) return volume;
-  items.forEach(item => {
-    if (!item.sets || !Array.isArray(item.sets)) return;
-    item.sets.forEach(set => {
-      volume += calcSetVolume(set.weight, set.reps, set.lReps, set.rReps, set.forcedReps, item.weightType);
-      if (item.isSuperSet) { 
-        if (item.superExerciseName) volume += calcSetVolume(set.superWeight, set.superReps, set.superLReps, set.superRReps, set.superForcedReps, item.superWeightType); 
-        if (item.superExerciseName3) volume += calcSetVolume(set.superWeight3, set.superReps3, set.superLReps3, set.superRReps3, set.superForcedReps3, item.superWeightType3); 
-      }
-      if (item.isDropSet && set.dropSets && Array.isArray(set.dropSets)) { 
-        set.dropSets.forEach(ds => { 
-          volume += calcSetVolume(ds.weight, ds.reps, ds.lReps, ds.rReps, ds.forcedReps, item.weightType); 
-          if (item.isSuperSet) {
-            if (item.superExerciseName) volume += calcSetVolume(ds.superWeight, ds.superReps, ds.superLReps, ds.superRReps, ds.superForcedReps, item.superWeightType); 
-            if (item.superExerciseName3) volume += calcSetVolume(ds.superWeight3, ds.superReps3, ds.superLReps3, ds.superRReps3, ds.superForcedReps3, item.superWeightType3); 
+const calculateWorkoutTotals = (items, duration, bodyWeight) => {
+  let totalVolume = 0;
+  let cardioKcal = 0;
+  let cardioTimeMin = 0;
+  const baseWeight = bodyWeight || 60;
+
+  const processedItems = items.map(item => {
+    let itemVolume = 0;
+    if (item.sets && Array.isArray(item.sets)) {
+      item.sets.forEach(set => {
+        if (item.category === '有酸素' || item.weightType === 'cardio') {
+          cardioKcal += Number(set.calories) || 0;
+          cardioTimeMin += Number(set.time) || 0;
+        } else {
+          itemVolume += calcSetVolume(set, item.weightType, baseWeight);
+          if (item.isSuperSet) { 
+            if (item.superExerciseName) itemVolume += calcSetVolume({weight: set.superWeight, reps: set.superReps, lReps: set.superLReps, rReps: set.superRReps, forcedReps: set.superForcedReps}, item.superWeightType, baseWeight); 
+            if (item.superExerciseName3) itemVolume += calcSetVolume({weight: set.superWeight3, reps: set.superReps3, lReps: set.superLReps3, rReps: set.superRReps3, forcedReps: set.superForcedReps3}, item.superWeightType3, baseWeight); 
           }
-        }); 
-      }
-    });
+          if (item.isDropSet && set.dropSets) { 
+            set.dropSets.forEach(ds => { 
+              itemVolume += calcSetVolume(ds, item.weightType, baseWeight); 
+              if (item.isSuperSet) {
+                if (item.superExerciseName) itemVolume += calcSetVolume({weight: ds.superWeight, reps: ds.superReps, lReps: ds.superLReps, rReps: ds.superRReps, forcedReps: ds.superForcedReps}, item.superWeightType, baseWeight); 
+                if (item.superExerciseName3) itemVolume += calcSetVolume({weight: ds.superWeight3, reps: ds.superReps3, lReps: ds.superLReps3, rReps: ds.superRReps3, forcedReps: ds.superForcedReps3}, item.superWeightType3, baseWeight); 
+              }
+            }); 
+          }
+        }
+      });
+    }
+    return { ...item, itemVolume };
   });
-  return volume;
+
+  processedItems.forEach(i => { totalVolume += (i.itemVolume || 0); });
+
+  const weightliftingMs = Math.max(0, duration - (cardioTimeMin * 60000));
+  const weightliftingHrs = weightliftingMs / 3600000;
+  const weightKcal = 6.0 * baseWeight * weightliftingHrs * 1.05;
+  const totalCalories = Math.round(cardioKcal + weightKcal);
+
+  return { processedItems, totalVolume, totalCalories };
 };
 
 const getVolumeMetaphor = (kg) => {
@@ -223,6 +282,7 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
     const isLR = wType === 'lr';
     const isPlate = wType === 'plate';
     const isBodyWeight = wType === 'bodyWeight';
+    const isCardio = wType === 'cardio';
     
     const val = (f) => {
       let fieldName = f;
@@ -230,6 +290,23 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
       if (type === 'super3') fieldName = 'super' + f.charAt(0).toUpperCase() + f.slice(1) + '3';
       return setObj[fieldName] || '';
     };
+
+    if (isCardio) {
+      const distance = val('distance');
+      const time = val('time');
+      const calories = val('calories');
+      if (!distance && !time && !calories) return null;
+      return (
+        <div className={`flex justify-between items-center border-b border-slate-200/50 dark:border-slate-800/50 pb-2 pt-2 last:border-0 ${isDrop ? 'pl-8' : ''}`}>
+          <span className="font-bold w-16 text-sm shrink-0 text-slate-500 dark:text-slate-400">{label}</span>
+          <div className="flex-1 flex justify-end items-center px-1 gap-3">
+             {distance && <span className="font-bold text-slate-800 dark:text-slate-100">{distance}<span className="text-xs font-normal text-slate-400 ml-0.5">km</span></span>}
+             {time && <span className="font-bold text-slate-800 dark:text-slate-100">{time}<span className="text-xs font-normal text-slate-400 ml-0.5">分</span></span>}
+             {calories && <span className="font-bold text-slate-800 dark:text-slate-100">{calories}<span className="text-xs font-normal text-slate-400 ml-0.5">kcal</span></span>}
+          </div>
+        </div>
+      );
+    }
 
     const weight = val('weight');
     const reps = val('reps');
@@ -240,6 +317,8 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
     if (!weight && !reps && !lReps && !rReps) return null;
 
     const forced = forcedReps ? <span className="text-rose-500 text-xs ml-1">(+{forcedReps})</span> : null;
+    const prBadgeWeight = setObj.isWeightPR && type === 'main' ? <span className="ml-1 text-[10px] text-amber-500 bg-amber-50 dark:bg-amber-950/50 px-1 py-0.5 rounded border border-amber-200 dark:border-amber-900 font-bold">🏆重量更新</span> : null;
+    const prBadgeReps = setObj.isRepsPR && type === 'main' ? <span className="ml-1 text-[10px] text-indigo-500 bg-indigo-50 dark:bg-indigo-950/50 px-1 py-0.5 rounded border border-indigo-200 dark:border-indigo-900 font-bold">🎖️回数更新</span> : null;
 
     let displayWeight = weight || 0;
     let weightLabel = 'kg';
@@ -247,46 +326,36 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
     if (isPlate) weightLabel = '枚';
     else if (wType === 'oneSide') weightLabel = 'kg(片)';
     else if (isBodyWeight) {
-      if (Number(weight) < 0) {
-        displayWeight = weight;
-        weightLabel = 'kg(アシスト)';
-      } else if (Number(weight) > 0) {
-        displayWeight = `+${weight}`;
-        weightLabel = 'kg(加重)';
-      } else {
-        displayWeight = '自重';
-        weightLabel = '';
-      }
+      if (Number(weight) < 0) { displayWeight = weight; weightLabel = 'kg(アシスト)'; } 
+      else if (Number(weight) > 0) { displayWeight = `+${weight}`; weightLabel = 'kg(加重)'; } 
+      else { displayWeight = '自重'; weightLabel = ''; }
     }
 
     return (
       <div className={`flex justify-between items-center border-b border-slate-200/50 dark:border-slate-800/50 pb-2 pt-2 last:border-0 ${isDrop ? 'pl-8' : ''}`}>
-        <span className={`font-bold w-16 text-sm shrink-0 ${isDrop ? 'text-orange-500' : 'text-slate-500 dark:text-slate-400'} ${type !== 'main' && !isDrop ? 'pl-4 text-indigo-500 dark:text-indigo-400' : ''}`}>
+        <span className={`font-bold w-16 text-sm shrink-0 flex flex-col ${isDrop ? 'text-orange-500' : 'text-slate-500 dark:text-slate-400'} ${type !== 'main' && !isDrop ? 'pl-4 text-indigo-500 dark:text-indigo-400' : ''}`}>
           {label}
         </span>
         {isLR ? (
            <div className="flex-1 flex justify-between items-center px-1 gap-2 overflow-hidden">
-             <span className="font-bold text-base tracking-wide text-slate-800 dark:text-slate-100 text-center w-20 shrink-0 whitespace-nowrap">
-               {displayWeight}
-               {weightLabel && <span className="text-xs font-normal text-slate-400 dark:text-slate-500 ml-0.5">{weightLabel}</span>}
+             <span className="font-bold text-base tracking-wide text-slate-800 dark:text-slate-100 text-center w-24 shrink-0 whitespace-nowrap flex flex-col items-center">
+               <span>{displayWeight}{weightLabel && <span className="text-xs font-normal text-slate-400 ml-0.5">{weightLabel}</span>}</span>
+               {prBadgeWeight}
              </span>
-             <span className="font-bold text-sm sm:text-base tracking-wide text-slate-800 dark:text-slate-100 flex-1 text-right whitespace-nowrap overflow-hidden text-ellipsis">
-               L:{lReps || 0} <span className="text-slate-300 dark:text-slate-600 font-normal mx-0.5">/</span> R:{rReps || 0}
-               <span className="text-xs font-normal text-slate-400 dark:text-slate-500 ml-0.5">回</span>
-               {forced}
+             <span className="font-bold text-sm sm:text-base tracking-wide text-slate-800 dark:text-slate-100 flex-1 text-right whitespace-nowrap overflow-hidden text-ellipsis flex flex-col items-end">
+               <span>L:{lReps || 0} <span className="text-slate-300 dark:text-slate-600 font-normal mx-0.5">/</span> R:{rReps || 0}<span className="text-xs font-normal text-slate-400 ml-0.5">回</span>{forced}</span>
+               {prBadgeReps}
              </span>
            </div>
         ) : (
            <div className="flex-1 flex justify-between items-center px-1 gap-2">
-             <span className="font-bold text-base tracking-wide text-slate-800 dark:text-slate-100 text-center flex-1 whitespace-nowrap">
-               {displayWeight} 
-               {weightLabel && <span className="text-xs font-normal text-slate-400 dark:text-slate-500 ml-1">
-                 {weightLabel}
-               </span>}
+             <span className="font-bold text-base tracking-wide text-slate-800 dark:text-slate-100 text-center flex-1 whitespace-nowrap flex flex-col items-center">
+               <span>{displayWeight}{weightLabel && <span className="text-xs font-normal text-slate-400 ml-1">{weightLabel}</span>}</span>
+               {prBadgeWeight}
              </span>
-             <span className="font-bold text-base tracking-wide text-slate-800 dark:text-slate-100 w-24 text-right shrink-0 whitespace-nowrap">
-               {reps || 0} <span className="text-xs font-normal text-slate-400 dark:text-slate-500 ml-0.5">回</span>
-               {forced}
+             <span className="font-bold text-base tracking-wide text-slate-800 dark:text-slate-100 w-28 text-right shrink-0 whitespace-nowrap flex flex-col items-end">
+               <span>{reps || 0} <span className="text-xs font-normal text-slate-400 ml-0.5">回</span>{forced}</span>
+               {prBadgeReps}
              </span>
            </div>
         )}
@@ -324,25 +393,37 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
         )}
       </div>
 
-      {(post.bodyWeight || post.bodyFat) && (
-        <div className="pl-3 mb-3 flex gap-2">
+      <div className="pl-3 mb-3 flex flex-wrap gap-2">
+        {(post.bodyWeight || post.bodyFat) && (
           <div className="flex items-center gap-1.5 bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 text-xs font-bold px-2.5 py-1 rounded-md border border-indigo-100 dark:border-indigo-900">
             <Scale size={14} />
             {post.bodyWeight && `${post.bodyWeight}kg`}
             {post.bodyWeight && post.bodyFat && ' / '}
             {post.bodyFat && `${post.bodyFat}%`}
           </div>
-        </div>
-      )}
-      {(post.volume && !isNaN(post.volume) && post.volume > 0) ? (
-        <div className="pl-3 mb-4">
-          <div className="inline-flex items-center gap-2 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs font-bold px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700">
-            <Flame size={14} className="text-orange-500" />
+        )}
+        {post.totalSets > 0 && (
+          <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs font-bold px-2.5 py-1 rounded-md border border-slate-200 dark:border-slate-700">
+             <ListPlus size={14} /> 計 {post.totalSets} Set
+          </div>
+        )}
+      </div>
+      
+      <div className="pl-3 mb-4 flex flex-wrap gap-2">
+        {(post.volume && !isNaN(post.volume) && post.volume > 0) ? (
+          <div className="inline-flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs font-bold px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700">
+            <Dumbbell size={14} className="text-slate-500" />
             総負荷量: {Number(post.volume).toLocaleString()}kg
             <span className="text-slate-400 dark:text-slate-500 font-normal">（{getVolumeMetaphor(post.volume)}）</span>
           </div>
-        </div>
-      ) : null}
+        ) : null}
+        {(post.calories && !isNaN(post.calories) && post.calories > 0) ? (
+          <div className="inline-flex items-center gap-1.5 bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-400 text-xs font-bold px-3 py-1.5 rounded-lg border border-amber-200 dark:border-amber-900">
+            <Flame size={14} className="text-amber-500" />
+            総消費: {Number(post.calories).toLocaleString()} kcal
+          </div>
+        ) : null}
+      </div>
 
       <div className="pl-3 space-y-3 mb-4">
         {post.items && Array.isArray(post.items) && post.items.map((item, idx) => (
@@ -350,9 +431,10 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
             <div className="flex items-center justify-between mb-3">
               <div className="flex flex-col gap-1.5 flex-1">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <Dumbbell size={14} className="text-emerald-500" />
+                  {item.category === '有酸素' ? <Activity size={14} className="text-cyan-500"/> : <Dumbbell size={14} className="text-emerald-500" />}
                   <span className="font-bold text-slate-800 dark:text-slate-100 text-[15px]">{item.exerciseName}</span>
                   {item.category && <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${getCategoryColor(item.category)}`}>{item.category}</span>}
+                  {item.itemVolume > 0 && <span className="text-xs font-bold text-slate-500 dark:text-slate-400 ml-auto">{item.itemVolume.toLocaleString()}kg</span>}
                 </div>
                 {item.isSuperSet && item.superExerciseName && (
                   <div className="flex items-center gap-2 flex-wrap pl-5">
@@ -432,7 +514,7 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
 }
 
 // --- 共通コンポーネント：ワークアウト入力フォーム ---
-function WorkoutItemForm({ item, index, isFirst, isLast, availableExercises, updateItem, removeItem, moveItemUp, moveItemDown, addSet, removeSet, updateSet, addDropSet, removeDropSet, updateDropSet }) {
+function WorkoutItemForm({ item, index, isFirst, isLast, availableExercises, updateItem, removeItem, moveItemUp, moveItemDown, addSet, removeSet, updateSet, addDropSet, removeDropSet, updateDropSet, myPastPosts }) {
   
   const updateExerciseName = (newName, superIndex = 0) => {
     const exData = availableExercises.find(ex => ex.name === newName);
@@ -452,8 +534,20 @@ function WorkoutItemForm({ item, index, isFirst, isLast, availableExercises, upd
     return '重量kg';
   };
 
+  const prevRecord = useMemo(() => {
+    if (!item.exerciseName || !myPastPosts) return null;
+    for (let p of myPastPosts) {
+      const found = p.items?.find(i => i.exerciseName === item.exerciseName);
+      if (found && found.sets?.length > 0) {
+        return { date: p.date, sets: found.sets, weightType: found.weightType };
+      }
+    }
+    return null;
+  }, [item.exerciseName, myPastPosts]);
+
   const renderInputRow = (setObj, wType, type, isDrop, dropId = null) => {
     const isLR = wType === 'lr';
+    const isCardio = wType === 'cardio';
     
     const val = (f) => {
       let fieldName = f;
@@ -470,6 +564,16 @@ function WorkoutItemForm({ item, index, isFirst, isLast, availableExercises, upd
       if (isDrop) updateDropSet(item.id, setObj._parentId, dropId, fieldName, v);
       else updateSet(item.id, setObj.id, fieldName, v);
     };
+
+    if (isCardio) {
+      return (
+        <div className="flex-1 flex gap-2 min-w-0">
+           <input type="number" value={val('distance')} onChange={(e) => update('distance', e.target.value)} placeholder="距離(km)" className="flex-1 min-w-0 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded py-2 px-1 text-center text-slate-800 dark:text-slate-100 font-bold focus:outline-none focus:border-emerald-500 text-base" style={{ fontSize: '16px' }}/>
+           <input type="number" value={val('time')} onChange={(e) => update('time', e.target.value)} placeholder="時間(分)" className="flex-1 min-w-0 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded py-2 px-1 text-center text-slate-800 dark:text-slate-100 font-bold focus:outline-none focus:border-emerald-500 text-base" style={{ fontSize: '16px' }}/>
+           <input type="number" value={val('calories')} onChange={(e) => update('calories', e.target.value)} placeholder="kcal" className="flex-1 min-w-0 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded py-2 px-1 text-center text-slate-800 dark:text-slate-100 font-bold focus:outline-none focus:border-emerald-500 text-base" style={{ fontSize: '16px' }}/>
+        </div>
+      );
+    }
 
     return (
       <div className="flex-1 flex gap-2 min-w-0">
@@ -517,18 +621,36 @@ function WorkoutItemForm({ item, index, isFirst, isLast, availableExercises, upd
         <button onClick={() => removeItem(item.id)} className="ml-2 text-slate-400 hover:text-rose-500 p-2 flex-shrink-0 bg-slate-50 dark:bg-slate-800 rounded-lg transition-colors"><Trash2 size={18} /></button>
       </div>
 
-      <div className="flex gap-2 mb-5 overflow-x-auto scrollbar-hide py-1 pl-8">
-        <button onClick={() => updateItem(item.id, { isSuperSet: !item.isSuperSet })} className={`whitespace-nowrap px-3 py-1.5 text-xs font-bold rounded-full border transition-colors ${item.isSuperSet ? 'bg-indigo-50 dark:bg-indigo-950 border-indigo-300 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300' : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'}`}>スーパー</button>
-        <button onClick={() => updateItem(item.id, { isDropSet: !item.isDropSet })} className={`whitespace-nowrap px-3 py-1.5 text-xs font-bold rounded-full border transition-colors ${item.isDropSet ? 'bg-orange-50 dark:bg-orange-950 border-orange-300 dark:border-orange-800 text-orange-700 dark:text-orange-300' : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'}`}>ドロップ</button>
-        <button onClick={() => updateItem(item.id, { isForcedReps: !item.isForcedReps })} className={`whitespace-nowrap px-3 py-1.5 text-xs font-bold rounded-full border transition-colors ${item.isForcedReps ? 'bg-rose-50 dark:bg-rose-950 border-rose-300 dark:border-rose-800 text-rose-700 dark:text-rose-300' : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'}`}>補助</button>
-      </div>
+      {prevRecord && (
+        <div className="mb-4 pl-8 text-xs font-bold text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-950/50 p-2 rounded-lg border border-slate-100 dark:border-slate-800">
+          <span className="text-emerald-600 dark:text-emerald-400 mr-2 flex items-center inline-flex gap-1"><Clock size={12}/>前回 ({prevRecord.date.substring(5).replace('-','/')})</span>
+          <div className="mt-1 flex flex-wrap gap-2">
+            {prevRecord.sets.map((s, i) => (
+               <span key={i} className="bg-white dark:bg-slate-900 px-1.5 py-0.5 rounded border border-slate-200 dark:border-slate-700">
+                  {prevRecord.weightType === 'cardio' ? 
+                    `${s.distance||0}km / ${s.time||0}分` : 
+                    `${s.weight||0}${prevRecord.weightType === 'plate' ? '枚' : 'kg'} x ${s.reps||Math.max(s.lReps||0, s.rReps||0)}回`
+                  }
+               </span>
+            ))}
+          </div>
+        </div>
+      )}
 
-      {item.isSuperSet && (
+      {item.weightType !== 'cardio' && (
+        <div className="flex gap-2 mb-5 overflow-x-auto scrollbar-hide py-1 pl-8">
+          <button onClick={() => updateItem(item.id, { isSuperSet: !item.isSuperSet })} className={`whitespace-nowrap px-3 py-1.5 text-xs font-bold rounded-full border transition-colors ${item.isSuperSet ? 'bg-indigo-50 dark:bg-indigo-950 border-indigo-300 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300' : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'}`}>スーパー</button>
+          <button onClick={() => updateItem(item.id, { isDropSet: !item.isDropSet })} className={`whitespace-nowrap px-3 py-1.5 text-xs font-bold rounded-full border transition-colors ${item.isDropSet ? 'bg-orange-50 dark:bg-orange-950 border-orange-300 dark:border-orange-800 text-orange-700 dark:text-orange-300' : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'}`}>ドロップ</button>
+          <button onClick={() => updateItem(item.id, { isForcedReps: !item.isForcedReps })} className={`whitespace-nowrap px-3 py-1.5 text-xs font-bold rounded-full border transition-colors ${item.isForcedReps ? 'bg-rose-50 dark:bg-rose-950 border-rose-300 dark:border-rose-800 text-rose-700 dark:text-rose-300' : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'}`}>補助</button>
+        </div>
+      )}
+
+      {item.isSuperSet && item.weightType !== 'cardio' && (
         <div className="mb-5 pl-8 border-l-2 border-indigo-300 dark:border-indigo-600 space-y-3">
           <div className="relative w-full">
             <select value={item.superExerciseName || ''} onChange={(e) => updateExerciseName(e.target.value, 2)} className="w-full bg-indigo-50/30 dark:bg-indigo-950/50 border border-indigo-100 dark:border-indigo-800 rounded-lg px-3 py-2 text-indigo-800 dark:text-indigo-300 font-bold appearance-none focus:outline-none focus:border-indigo-500 text-base pr-8" style={{ fontSize: '16px' }}>
               <option value="" disabled>スーパーセットの種目 (2種目目)</option>
-              {availableExercises.map(ex => <option key={ex.id} value={ex.name}>{ex.name}</option>)}
+              {availableExercises.filter(ex => ex.weightType !== 'cardio').map(ex => <option key={ex.id} value={ex.name}>{ex.name}</option>)}
             </select>
             <div className="absolute right-3 top-1/2 -translate-y-1/2 text-indigo-300 pointer-events-none text-xs">▼</div>
           </div>
@@ -536,7 +658,7 @@ function WorkoutItemForm({ item, index, isFirst, isLast, availableExercises, upd
             <div className="relative w-full">
               <select value={item.superExerciseName3 || ''} onChange={(e) => updateExerciseName(e.target.value, 3)} className="w-full bg-indigo-50/30 dark:bg-indigo-950/50 border border-indigo-100 dark:border-indigo-800 rounded-lg px-3 py-2 text-indigo-800 dark:text-indigo-300 font-bold appearance-none focus:outline-none focus:border-indigo-500 text-base pr-8" style={{ fontSize: '16px' }}>
                 <option value="">ジャイアントセット (3種目目・任意)</option>
-                {availableExercises.map(ex => <option key={ex.id} value={ex.name}>{ex.name}</option>)}
+                {availableExercises.filter(ex => ex.weightType !== 'cardio').map(ex => <option key={ex.id} value={ex.name}>{ex.name}</option>)}
               </select>
               <div className="absolute right-3 top-1/2 -translate-y-1/2 text-indigo-300 pointer-events-none text-xs">▼</div>
             </div>
@@ -559,7 +681,7 @@ function WorkoutItemForm({ item, index, isFirst, isLast, availableExercises, upd
               <button onClick={() => removeSet(item.id, set.id)} disabled={item.sets.length === 1} className="w-6 flex-shrink-0 text-slate-400 hover:text-rose-500 disabled:opacity-30 flex justify-center"><X size={18} /></button>
             </div>
 
-            {item.isDropSet && set.dropSets && set.dropSets.map(ds => (
+            {item.isDropSet && item.weightType !== 'cardio' && set.dropSets && set.dropSets.map(ds => (
               <div key={ds.id} className="border-l-2 border-orange-200 dark:border-orange-800 pl-3 flex items-center gap-2 ml-4">
                 <TrendingDown size={16} className="text-orange-400 flex-shrink-0" />
                 {renderInputRow({ ...ds, _parentId: set.id }, item.weightType, 'main', true, ds.id)}
@@ -567,11 +689,11 @@ function WorkoutItemForm({ item, index, isFirst, isLast, availableExercises, upd
               </div>
             ))}
 
-            {item.isDropSet && (
+            {item.isDropSet && item.weightType !== 'cardio' && (
               <button onClick={() => addDropSet(item.id, set.id)} className="ml-4 text-xs text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/50 hover:bg-orange-100 dark:hover:bg-orange-900 border border-orange-200 dark:border-orange-800 px-3 py-1.5 rounded transition-colors font-bold flex items-center gap-1"><Plus size={12}/>ドロップ追加</button>
             )}
 
-            {item.isSuperSet && item.superExerciseName && (
+            {item.isSuperSet && item.superExerciseName && item.weightType !== 'cardio' && (
               <div className="pt-2 border-t border-slate-200 dark:border-slate-800 space-y-3">
                 <div className="flex items-center gap-2 pl-4 border-l-2 border-indigo-300 dark:border-indigo-700 ml-1">
                   <Zap size={16} className="text-indigo-400 flex-shrink-0" />
@@ -588,7 +710,7 @@ function WorkoutItemForm({ item, index, isFirst, isLast, availableExercises, upd
               </div>
             )}
             
-            {item.isSuperSet && item.superExerciseName3 && (
+            {item.isSuperSet && item.superExerciseName3 && item.weightType !== 'cardio' && (
               <div className="pt-2 border-t border-slate-200 dark:border-slate-800 space-y-3">
                 <div className="flex items-center gap-2 pl-4 border-l-2 border-indigo-300 dark:border-indigo-700 ml-1">
                   <Zap size={16} className="text-indigo-400 flex-shrink-0" />
@@ -696,7 +818,10 @@ export default function App() {
     if (!db) return false;
     const accountData = accountsInfo[userId];
     if (!accountData || !accountData.pin) {
-      try { await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', userId), { pin: pin, isTraining: false, lastActive: Date.now(), theme: 'light' }); setCurrentUser(userId); } catch (e) {}
+      // Default info based on known facts (implicit context handling)
+      const defaultGender = userId === '勇太' ? 'male' : 'female';
+      const defaultBirthDate = userId === '勇太' ? '2002-08-26' : '';
+      try { await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', userId), { pin: pin, isTraining: false, lastActive: Date.now(), theme: 'light', gender: defaultGender, birthDate: defaultBirthDate }, { merge: true }); setCurrentUser(userId); } catch (e) {}
     } else if (accountData.pin === pin) {
       setCurrentUser(userId);
       try { await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', userId), { lastActive: Date.now() }, { merge: true }); } catch (e) {}
@@ -716,7 +841,7 @@ export default function App() {
 
   const handleStartTraining = async (gymId) => {
     if (!currentUser || !db) return;
-    try { await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), { isTraining: true, trainingStartTime: Date.now(), currentGymId: gymId, lastActive: Date.now() }, { merge: true }); } catch (e) {}
+    try { await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), { isTraining: true, trainingStartTime: Date.now(), currentGymId: gymId, currentExerciseName: '', lastActive: Date.now() }, { merge: true }); } catch (e) {}
   };
 
   const handlePostWorkout = async (gymName, workoutItems, bodyWeight, bodyFat) => {
@@ -725,21 +850,50 @@ export default function App() {
     const startTime = myInfo?.trainingStartTime || Date.now();
     const endTime = Date.now();
     const duration = endTime - startTime;
-    const volume = calculateTotalVolume(workoutItems);
+    
+    // PR Calculation logic
+    const myPastPosts = posts.filter(p => p.author === currentUser);
+    workoutItems.forEach(item => {
+        let maxW = 0; let maxR = 0; let hasDone = false;
+        myPastPosts.forEach(p => {
+            p.items?.forEach(pi => {
+                if (pi.exerciseName === item.exerciseName && pi.weightType !== 'cardio') {
+                    hasDone = true;
+                    pi.sets?.forEach(ps => {
+                        const w = Number(ps.weight)||0; const r = Number(ps.reps)||0;
+                        if (w > maxW) { maxW = w; maxR = r; }
+                        else if (w === maxW && r > maxR) { maxR = r; }
+                    });
+                }
+            });
+        });
+        if (hasDone && item.weightType !== 'cardio') {
+            item.sets.forEach(set => {
+                const w = Number(set.weight)||0; const r = Number(set.reps)||0;
+                if (w > maxW && w > 0) { set.isWeightPR = true; maxW = w; maxR = r; } 
+                else if (w === maxW && w > 0 && r > maxR) { set.isRepsPR = true; maxR = r; }
+            });
+        }
+    });
+
+    const { processedItems, totalVolume, totalCalories } = calculateWorkoutTotals(workoutItems, duration, bodyWeight || myInfo?.weight);
+    const totalSets = processedItems.reduce((acc, it) => acc + (it.sets?.length || 0), 0);
+
     const newDocId = `workout_${generateId()}`;
     try {
       await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'workouts', newDocId), {
-        author: currentUser, gymName, items: workoutItems, timestamp: Date.now(), startTime, endTime, duration, date: new Date().toISOString(), likes: 0, likedByMe: false, bodyWeight: bodyWeight || null, bodyFat: bodyFat || null, volume: volume
+        author: currentUser, gymName, items: processedItems, timestamp: Date.now(), startTime, endTime, duration, date: new Date().toISOString(), likes: 0, likedByMe: false, bodyWeight: bodyWeight || null, bodyFat: bodyFat || null, volume: totalVolume, calories: totalCalories, totalSets: totalSets
       });
-      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), { isTraining: false, trainingStartTime: null, currentGymId: null, lastActive: Date.now() }, { merge: true });
+      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), { isTraining: false, trainingStartTime: null, currentGymId: null, currentExerciseName: '', lastActive: Date.now() }, { merge: true });
       setDraftWorkoutItems([]); setCurrentTab('timeline');
     } catch (e) {}
   };
 
   const handleUpdateWorkout = async (postId, updatedData) => {
     if (!currentUser || !db) return;
-    const volume = calculateTotalVolume(updatedData.items);
-    try { await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'workouts', postId), { ...updatedData, volume }, { merge: true }); setEditingPost(null); } catch (e) {}
+    const { processedItems, totalVolume, totalCalories } = calculateWorkoutTotals(updatedData.items, updatedData.duration, updatedData.bodyWeight);
+    const totalSets = processedItems.reduce((acc, it) => acc + (it.sets?.length || 0), 0);
+    try { await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'workouts', postId), { ...updatedData, items: processedItems, volume: totalVolume, calories: totalCalories, totalSets: totalSets }, { merge: true }); setEditingPost(null); } catch (e) {}
   };
 
   const handleDeleteWorkout = async (postId) => {
@@ -751,7 +905,7 @@ export default function App() {
   const handleCancelTraining = async () => {
     if (!window.confirm("現在の記録を破棄してトレーニングを終了しますか？")) return;
     if (!currentUser || !db) return;
-    try { await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), { isTraining: false, trainingStartTime: null, currentGymId: null, lastActive: Date.now() }, { merge: true }); setDraftWorkoutItems([]); setCurrentTab('timeline'); } catch (e) {}
+    try { await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), { isTraining: false, trainingStartTime: null, currentGymId: null, currentExerciseName: '', lastActive: Date.now() }, { merge: true }); setDraftWorkoutItems([]); setCurrentTab('timeline'); } catch (e) {}
   };
 
   const handleSaveProfile = async (data) => {
@@ -765,8 +919,9 @@ export default function App() {
   };
 
   const myInfo = accountsInfo[currentUser] || {};
+  const allGyms = useMemo(() => [{ id: 'common', name: 'フリーウェイト', createdAt: 0 }, ...gyms], [gyms]);
 
-  const handleImportWorkout = (post) => {
+  const handleImportWorkout = async (post) => {
     if (myInfo.isTraining && myInfo.currentGymId) {
        const currentGymName = gyms.find(g => g.id === myInfo.currentGymId)?.name;
        if (currentGymName !== post.gymName) {
@@ -788,14 +943,22 @@ export default function App() {
     setDraftWorkoutItems(newItems);
     
     if (!myInfo.isTraining) {
-      const gym = gyms.find(g => g.name === post.gymName);
-      if (gym) handleStartTraining(gym.id);
+      const gym = allGyms.find(g => g.name === post.gymName);
+      if (gym) await handleStartTraining(gym.id);
     }
     
     setCurrentTab('record');
   };
 
-  const allGyms = useMemo(() => [{ id: 'common', name: 'フリーウェイト', createdAt: 0 }, ...gyms], [gyms]);
+  // リアルタイム種目同期
+  useEffect(() => {
+    if(myInfo.isTraining && draftWorkoutItems.length > 0 && db) {
+        const currentEx = draftWorkoutItems[draftWorkoutItems.length - 1].exerciseName;
+        if(currentEx && currentEx !== myInfo.currentExerciseName) {
+            setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), { currentExerciseName: currentEx }, { merge: true }).catch(()=>{});
+        }
+    }
+  }, [draftWorkoutItems, myInfo.isTraining, myInfo.currentExerciseName, currentUser]);
 
   if (!isFullyLoaded) {
     return (
@@ -844,8 +1007,9 @@ export default function App() {
           </div>
         </div>
         {partnerIsTraining && !isSameGym && (
-          <div className="bg-gradient-to-r from-emerald-500 to-teal-500 text-white px-4 py-2 flex items-center justify-center gap-2 text-sm font-bold animate-in slide-in-from-top duration-300">
-            <Flame size={16} className="animate-pulse text-amber-300" /> {partnerName}さんがトレーニング中です！ <TimerDisplay startTime={partnerInfo.trainingStartTime} />
+          <div className="bg-gradient-to-r from-emerald-500 to-teal-500 text-white px-4 py-2 flex flex-col items-center justify-center text-xs font-bold animate-in slide-in-from-top duration-300">
+            <div className="flex items-center gap-2 mb-0.5"><Flame size={14} className="animate-pulse text-amber-300" /> {partnerName}さんがトレーニング中です！ <TimerDisplay startTime={partnerInfo.trainingStartTime} /></div>
+            <div className="text-[10px] text-emerald-100">{partnerInfo.currentGymId ? allGyms.find(g => g.id === partnerInfo.currentGymId)?.name : 'ジム'} - {partnerInfo.currentExerciseName || '準備中'}</div>
           </div>
         )}
       </header>
@@ -853,12 +1017,12 @@ export default function App() {
       <main className="p-4 max-w-md mx-auto w-full pb-40">
         {currentTab === 'timeline' && <TimelineView posts={posts} onToggleLike={toggleLike} onImport={handleImportWorkout} currentUser={currentUser} onDelete={handleDeleteWorkout} onEdit={setEditingPost} accountsInfo={accountsInfo} />}
         {currentTab === 'exercises' && <ExercisesView gyms={allGyms} exercises={exercises} />}
-        {currentTab === 'record' && <RecordView onStart={handleStartTraining} onPost={handlePostWorkout} onCancel={handleCancelTraining} myInfo={myInfo} gyms={allGyms} exercises={exercises} workoutItems={draftWorkoutItems} setWorkoutItems={setDraftWorkoutItems} />}
+        {currentTab === 'record' && <RecordView onStart={handleStartTraining} onPost={handlePostWorkout} onCancel={handleCancelTraining} myInfo={myInfo} gyms={allGyms} exercises={exercises} workoutItems={draftWorkoutItems} setWorkoutItems={setDraftWorkoutItems} posts={posts} />}
         {currentTab === 'data' && <DataView posts={posts} currentUser={currentUser} partnerName={partnerName} accountsInfo={accountsInfo} onEdit={setEditingPost} onDelete={handleDeleteWorkout} onImport={handleImportWorkout} />}
         {currentTab === 'friends' && <FriendsView partnerName={partnerName} partnerInfo={partnerInfo} currentUser={currentUser} posts={posts} />}
       </main>
 
-      {editingPost && <EditWorkoutModal post={editingPost} gyms={allGyms} exercises={exercises} onClose={() => setEditingPost(null)} onSave={handleUpdateWorkout} />}
+      {editingPost && <EditWorkoutModal post={editingPost} gyms={allGyms} exercises={exercises} onClose={() => setEditingPost(null)} onSave={handleUpdateWorkout} myPastPosts={posts.filter(p => p.author === currentUser)} />}
 
       <nav className="fixed bottom-0 w-full bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 pt-1 pb-safe z-30 transition-colors" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 16px)' }}>
         <div className="flex justify-around items-center p-2 max-w-md mx-auto">
@@ -870,32 +1034,40 @@ export default function App() {
         </div>
       </nav>
 
-      <ProfileModal isOpen={showProfileModal} onClose={() => setShowProfileModal(false)} userInfo={myInfo} onSave={handleSaveProfile} />
+      <ProfileModal isOpen={showProfileModal} onClose={() => setShowProfileModal(false)} userInfo={myInfo} onSave={handleSaveProfile} currentUser={currentUser} />
     </div>
   );
 }
 
 // --- プロフィール設定モーダル ---
-function ProfileModal({ isOpen, onClose, userInfo, onSave }) {
+function ProfileModal({ isOpen, onClose, userInfo, onSave, currentUser }) {
   const [isUploading, setIsUploading] = useState(false);
   const [goal, setGoal] = useState(userInfo?.goal || '');
   const [theme, setTheme] = useState(userInfo?.theme || 'light');
   const [photoUrl, setPhotoUrl] = useState(userInfo?.photoUrl || null);
+  
+  const [birthDate, setBirthDate] = useState(userInfo?.birthDate || (currentUser === '勇太' ? '2002-08-26' : ''));
+  const [gender, setGender] = useState(userInfo?.gender || (currentUser === '勇太' ? 'male' : 'female'));
+  const [height, setHeight] = useState(userInfo?.height || '');
+  const [weight, setWeight] = useState(userInfo?.weight || '');
 
   useEffect(() => {
     if (isOpen) {
       setGoal(userInfo?.goal || '');
       setTheme(userInfo?.theme || 'light');
       setPhotoUrl(userInfo?.photoUrl || null);
+      setBirthDate(userInfo?.birthDate || (currentUser === '勇太' ? '2002-08-26' : ''));
+      setGender(userInfo?.gender || (currentUser === '勇太' ? 'male' : 'female'));
+      setHeight(userInfo?.height || '');
+      setWeight(userInfo?.weight || '');
     }
-  }, [isOpen, userInfo]);
+  }, [isOpen, userInfo, currentUser]);
 
   if (!isOpen) return null;
 
   const handleFileChange = (e) => {
     const file = e.target.files[0];
     if (!file) return;
-
     setIsUploading(true);
     const reader = new FileReader();
     reader.onload = (event) => {
@@ -903,8 +1075,7 @@ function ProfileModal({ isOpen, onClose, userInfo, onSave }) {
       img.onload = () => {
         const canvas = document.createElement('canvas');
         const MAX_SIZE = 400;
-        let width = img.width;
-        let height = img.height;
+        let width = img.width; let height = img.height;
         if (width > height) { if (width > MAX_SIZE) { height *= MAX_SIZE / width; width = MAX_SIZE; } } else { if (height > MAX_SIZE) { width *= MAX_SIZE / height; height = MAX_SIZE; } }
         canvas.width = width; canvas.height = height;
         const ctx = canvas.getContext('2d'); ctx.drawImage(img, 0, 0, width, height);
@@ -917,22 +1088,20 @@ function ProfileModal({ isOpen, onClose, userInfo, onSave }) {
   };
 
   const handleSave = () => {
-    onSave({ photoUrl, goal: goal.trim(), theme });
+    onSave({ photoUrl, goal: goal.trim(), theme, birthDate, gender, height: Number(height)||null, weight: Number(weight)||null });
   };
 
   return (
     <div className="fixed inset-0 bg-slate-900/60 dark:bg-black/70 backdrop-blur-sm z-50 flex flex-col items-center justify-center animate-in fade-in duration-200 p-4">
-      <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-sm p-6 shadow-2xl border border-slate-200 dark:border-slate-800">
+      <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-sm p-6 shadow-2xl border border-slate-200 dark:border-slate-800 max-h-[90vh] overflow-y-auto">
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-xl font-bold text-slate-800 dark:text-white">プロフィール設定</h2>
           <button onClick={onClose} className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 bg-slate-100 dark:bg-slate-800 rounded-full"><X size={20} /></button>
         </div>
         
         <div className="flex flex-col items-center space-y-6">
-          <div className="w-28 h-28 rounded-full bg-slate-100 dark:bg-slate-800 border-4 border-slate-200 dark:border-slate-700 overflow-hidden flex items-center justify-center relative">
-            {photoUrl ? (
-              <img src={photoUrl} alt="profile" className="w-full h-full object-cover" />
-            ) : <Users size={40} className="text-slate-300 dark:text-slate-500" />}
+          <div className="w-24 h-24 rounded-full bg-slate-100 dark:bg-slate-800 border-4 border-slate-200 dark:border-slate-700 overflow-hidden flex items-center justify-center relative">
+            {photoUrl ? <img src={photoUrl} alt="profile" className="w-full h-full object-cover" /> : <Users size={40} className="text-slate-300 dark:text-slate-500" />}
             {isUploading && <div className="absolute inset-0 bg-white/60 dark:bg-slate-900/60 flex items-center justify-center"><Activity className="animate-spin text-emerald-500" size={24} /></div>}
           </div>
           
@@ -950,9 +1119,33 @@ function ProfileModal({ isOpen, onClose, userInfo, onSave }) {
         </div>
 
         <div className="mt-6 space-y-4">
+          <div className="grid grid-cols-2 gap-3">
+             <div>
+                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">性別</label>
+                <select value={gender} onChange={e => setGender(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl p-2 text-sm text-slate-800 dark:text-slate-100 font-bold focus:outline-none focus:border-emerald-500">
+                   <option value="male">男性</option>
+                   <option value="female">女性</option>
+                </select>
+             </div>
+             <div>
+                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">生年月日</label>
+                <input type="date" value={birthDate} onChange={e => setBirthDate(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl p-2 text-sm text-slate-800 dark:text-slate-100 font-bold focus:outline-none focus:border-emerald-500" />
+             </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+             <div>
+                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">身長 (cm)</label>
+                <input type="number" value={height} onChange={e => setHeight(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl p-2 text-sm text-slate-800 dark:text-slate-100 font-bold focus:outline-none focus:border-emerald-500" placeholder="例: 170" />
+             </div>
+             <div>
+                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">基本体重 (kg)</label>
+                <input type="number" step="0.1" value={weight} onChange={e => setWeight(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl p-2 text-sm text-slate-800 dark:text-slate-100 font-bold focus:outline-none focus:border-emerald-500" placeholder="記録時の初期値" />
+             </div>
+          </div>
+
           <div>
             <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">目標 (100文字以内)</label>
-            <textarea value={goal} maxLength={100} onChange={e => setGoal(e.target.value)} placeholder="例: ベンチプレス100kg達成！" className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl p-3 text-base text-slate-800 dark:text-slate-100 focus:outline-none focus:border-emerald-500 resize-none" style={{ fontSize: '16px' }} rows={3} />
+            <textarea value={goal} maxLength={100} onChange={e => setGoal(e.target.value)} placeholder="例: ベンチプレス100kg達成！" className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl p-3 text-base text-slate-800 dark:text-slate-100 focus:outline-none focus:border-emerald-500 resize-none" style={{ fontSize: '16px' }} rows={2} />
             <div className="text-right text-xs text-slate-400 dark:text-slate-500 mt-1">{goal.length} / 100</div>
           </div>
           
@@ -1139,11 +1332,13 @@ function MonthlyReport({ monthDate, posts, userName, accountsInfo }) {
   });
 
   const totalVolume = monthPosts.reduce((sum, p) => sum + (Number(p.volume) || 0), 0);
+  const totalCalories = monthPosts.reduce((sum, p) => sum + (Number(p.calories) || 0), 0);
   const trainingDays = new Set(monthPosts.map(p => formatDateFromTimestamp(p.timestamp))).size;
   
   let totalSets = 0;
   let totalWorkoutsCount = 0;
-  const categoryCount = { '胸': 0, '背中': 0, '肩': 0, '腕': 0, '脚': 0, 'その他': 0 };
+  const categoryCount = {};
+  MUSCLE_CATEGORIES.forEach(c => categoryCount[c] = 0);
 
   monthPosts.forEach(post => {
     if (post.items) {
@@ -1152,11 +1347,8 @@ function MonthlyReport({ monthDate, posts, userName, accountsInfo }) {
         const sets = item.sets ? item.sets.length : 0;
         totalSets += sets;
         const cat = item.category || 'その他';
-        if (categoryCount[cat] !== undefined) {
-           categoryCount[cat] += sets;
-        } else {
-           categoryCount['その他'] += sets;
-        }
+        if (categoryCount[cat] !== undefined) categoryCount[cat] += sets;
+        else categoryCount['その他'] += sets;
       });
     }
   });
@@ -1182,16 +1374,16 @@ function MonthlyReport({ monthDate, posts, userName, accountsInfo }) {
                <p className="text-xl font-bold text-emerald-600 dark:text-emerald-400">{totalVolume.toLocaleString()} <span className="text-xs">kg</span></p>
              </div>
              <div className="bg-slate-50 dark:bg-slate-950 p-3 rounded-xl border border-slate-100 dark:border-slate-800">
+               <p className="text-[10px] text-slate-500 dark:text-slate-400 font-bold mb-1">月間総消費カロリー</p>
+               <p className="text-xl font-bold text-amber-600 dark:text-amber-400">{totalCalories.toLocaleString()} <span className="text-xs">kcal</span></p>
+             </div>
+             <div className="bg-slate-50 dark:bg-slate-950 p-3 rounded-xl border border-slate-100 dark:border-slate-800">
                <p className="text-[10px] text-slate-500 dark:text-slate-400 font-bold mb-1">トレーニング日数</p>
                <p className="text-xl font-bold text-slate-800 dark:text-slate-100">{trainingDays} <span className="text-xs">日</span></p>
              </div>
              <div className="bg-slate-50 dark:bg-slate-950 p-3 rounded-xl border border-slate-100 dark:border-slate-800">
                <p className="text-[10px] text-slate-500 dark:text-slate-400 font-bold mb-1">総セット数</p>
                <p className="text-xl font-bold text-slate-800 dark:text-slate-100">{totalSets} <span className="text-xs">set</span></p>
-             </div>
-             <div className="bg-slate-50 dark:bg-slate-950 p-3 rounded-xl border border-slate-100 dark:border-slate-800">
-               <p className="text-[10px] text-slate-500 dark:text-slate-400 font-bold mb-1">トレーニング回数(種目)</p>
-               <p className="text-xl font-bold text-slate-800 dark:text-slate-100">{totalWorkoutsCount} <span className="text-xs">回</span></p>
              </div>
           </div>
           
@@ -1203,7 +1395,7 @@ function MonthlyReport({ monthDate, posts, userName, accountsInfo }) {
                 const percent = Math.min(100, (categoryCount[cat] / totalSets) * 100);
                 return (
                   <div key={cat} className="flex items-center gap-2 text-xs font-bold">
-                    <span className="w-10 text-slate-600 dark:text-slate-300">{cat}</span>
+                    <span className="w-12 text-slate-600 dark:text-slate-300">{cat}</span>
                     <div className="flex-1 h-3 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
                       <div className={`h-full ${getCategoryColor(cat).split(' ')[0]} ${getCategoryColor(cat).split(' ')[2]}`} style={{ width: `${percent}%` }}></div>
                     </div>
@@ -1216,6 +1408,37 @@ function MonthlyReport({ monthDate, posts, userName, accountsInfo }) {
         </div>
       )}
     </div>
+  );
+}
+
+// --- 体組成バッジコンポーネント ---
+function BodyCompositionInfo({ info }) {
+  if (!info.height || !info.weight || !info.birthDate) return null;
+  const age = getAge(info.birthDate);
+  const bmr = getBMR(info.weight, info.height, age, info.gender);
+  
+  let ffmiBlock = null;
+  if (info.weight && info.height && info.gender && info.lastFat) {
+      const ffmi = getFFMI(info.weight, info.lastFat, info.height);
+      const evalText = getFFMIEval(ffmi, info.gender);
+      ffmiBlock = (
+         <div className="flex-1 bg-indigo-50 dark:bg-indigo-950/50 border border-indigo-100 dark:border-indigo-900 rounded-xl p-3">
+            <p className="text-[10px] text-indigo-600 dark:text-indigo-400 font-bold mb-1">FFMI (徐脂肪量指数)</p>
+            <p className="text-lg font-bold text-indigo-700 dark:text-indigo-300">{ffmi.toFixed(1)} <span className="text-xs font-normal">({evalText})</span></p>
+            <p className="text-[9px] text-indigo-500 dark:text-indigo-500 mt-1">※筋肉量の指標。男性20、女性16以上で優秀です。</p>
+         </div>
+      );
+  }
+
+  return (
+     <div className="flex gap-3 mb-6">
+        <div className="flex-1 bg-amber-50 dark:bg-amber-950/50 border border-amber-100 dark:border-amber-900 rounded-xl p-3">
+           <p className="text-[10px] text-amber-600 dark:text-amber-400 font-bold mb-1">基礎代謝 (BMR)</p>
+           <p className="text-lg font-bold text-amber-700 dark:text-amber-300">{bmr.toLocaleString()} <span className="text-xs font-normal">kcal/日</span></p>
+           <p className="text-[9px] text-amber-500 dark:text-amber-500 mt-1">※Mifflin-St Jeor式による推定値</p>
+        </div>
+        {ffmiBlock}
+     </div>
   );
 }
 
@@ -1265,10 +1488,16 @@ function DataView({ posts, currentUser, partnerName, accountsInfo, onEdit, onDel
 
   const selectedPosts = posts.filter(p => formatDateFromTimestamp(p.timestamp) === selectedDateStr);
 
+  const myInfo = accountsInfo[currentUser] || {};
+  const lastFatPost = myPosts.find(p => p.bodyFat);
+  const compositionInfo = { ...myInfo, lastFat: lastFatPost ? lastFatPost.bodyFat : null };
+
   return (
     <div className="space-y-6">
       <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-6">データ</h2>
       
+      <BodyCompositionInfo info={compositionInfo} />
+
       <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
         <div className="flex justify-between items-center mb-4">
           <button onClick={() => setCurrentMonth(new Date(year, month - 1, 1))} className="text-slate-400 hover:text-emerald-500 font-bold p-2 transition-colors">&lt;</button>
@@ -1316,15 +1545,16 @@ function DataView({ posts, currentUser, partnerName, accountsInfo, onEdit, onDel
 }
 
 // --- 記録入力画面 ---
-function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workoutItems, setWorkoutItems }) {
+function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workoutItems, setWorkoutItems, posts }) {
   const [selectedGymId, setSelectedGymId] = useState(myInfo.currentGymId || (gyms.filter(g => g.id !== 'common')[0]?.id || ''));
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedCategories, setSelectedCategories] = useState([]);
-  const [bodyWeight, setBodyWeight] = useState('');
+  const [bodyWeight, setBodyWeight] = useState(myInfo.weight || '');
   const [bodyFat, setBodyFat] = useState('');
 
   const isTraining = myInfo.isTraining;
-  
+  const myPastPosts = posts.filter(p => p.author === myInfo.name || p.author === myInfo.userId); // fallback for author 
+
   const availableExercises = exercises.filter(ex => {
     if (ex.gymId !== selectedGymId && ex.gymId !== 'common' && selectedGymId !== 'common') return false; 
     if (selectedCategories.length === 0) return true;
@@ -1343,13 +1573,14 @@ function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workou
   
   const addExerciseItem = (defaultName = '') => {
     const defaultEx = availableExercises.find(ex => ex.name === defaultName) || (availableExercises.length > 0 ? availableExercises[0] : null);
+    const isCardio = defaultEx ? defaultEx.weightType === 'cardio' : false;
     const newItem = { 
       id: generateId(), 
       exerciseName: defaultEx ? defaultEx.name : '', 
       weightType: defaultEx ? (defaultEx.weightType || 'total') : 'total',
       category: defaultEx ? (defaultEx.category || 'その他') : 'その他',
       isSuperSet: false, isDropSet: false, isForcedReps: false, memo: '',
-      sets: [{ id: generateId(), weight: '', reps: '', lReps: '', rReps: '' }] 
+      sets: [ isCardio ? { id: generateId(), distance: '', time: '', calories: '' } : { id: generateId(), weight: '', reps: '', lReps: '', rReps: '' } ] 
     };
     setWorkoutItems([...workoutItems, newItem]);
   };
@@ -1372,7 +1603,10 @@ function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workou
   const addSet = (itemId) => {
     setWorkoutItems(prev => prev.map(item => {
       if (item.id === itemId) {
-        const lastSet = (item.sets && item.sets.length > 0) ? item.sets[item.sets.length - 1] : { weight: '', reps: '', lReps: '', rReps: '' };
+        const lastSet = (item.sets && item.sets.length > 0) ? item.sets[item.sets.length - 1] : {};
+        if (item.weightType === 'cardio') {
+           return { ...item, sets: [...(item.sets || []), { id: generateId(), distance: lastSet.distance || '', time: lastSet.time || '', calories: lastSet.calories || '' }]};
+        }
         return { ...item, sets: [...(item.sets || []), { id: generateId(), weight: lastSet.weight || '', reps: lastSet.reps || '', lReps: lastSet.lReps || '', rReps: lastSet.rReps || '' }]};
       }
       return item;
@@ -1419,14 +1653,15 @@ function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workou
   const handleSubmit = async () => {
     const isValid = workoutItems.every(item => {
       if (!item.exerciseName || !item.sets || item.sets.length === 0) return false;
+      if (item.weightType === 'cardio') return item.sets.every(set => set.distance !== '' || set.time !== '' || set.calories !== '');
       if (item.weightType === 'lr') return item.sets.every(set => set.weight !== '' && set.lReps !== '' && set.rReps !== '');
       return item.sets.every(set => set.weight !== '' && set.reps !== '');
     });
-    if (!isValid || workoutItems.length === 0) { alert("種目を選択し、すべての重量と回数を入力してください。"); return; }
+    if (!isValid || workoutItems.length === 0) { alert("種目を選択し、すべての入力を完了してください。"); return; }
     setIsSubmitting(true);
     const gym = gyms.find(g => g.id === selectedGymId);
     await onPost(gym ? gym.name : '不明なジム', workoutItems, Number(bodyWeight), Number(bodyFat));
-    setBodyWeight(''); setBodyFat(''); setIsSubmitting(false);
+    setBodyWeight(myInfo.weight || ''); setBodyFat(''); setIsSubmitting(false);
   };
 
   const toggleCategory = (cat) => setSelectedCategories(prev => prev.includes(cat) ? prev.filter(c => c !== cat) : [...prev, cat]);
@@ -1496,6 +1731,7 @@ function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workou
                addDropSet={addDropSet} 
                removeDropSet={removeDropSet} 
                updateDropSet={updateDropSetField}
+               myPastPosts={myPastPosts}
              />
           ))}
 
@@ -1527,7 +1763,7 @@ function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workou
 }
 
 // --- 編集モーダル ---
-function EditWorkoutModal({ post, gyms, exercises, onClose, onSave }) {
+function EditWorkoutModal({ post, gyms, exercises, onClose, onSave, myPastPosts }) {
   const safeItems = post.items ? JSON.parse(JSON.stringify(post.items)) : [];
   const [workoutItems, setWorkoutItems] = useState(safeItems);
   
@@ -1572,6 +1808,7 @@ function EditWorkoutModal({ post, gyms, exercises, onClose, onSave }) {
   const handleSave = () => {
     const isValid = workoutItems.every(item => {
       if (!item.exerciseName || !item.sets || item.sets.length === 0) return false;
+      if (item.weightType === 'cardio') return item.sets.every(set => set.distance !== '' || set.time !== '' || set.calories !== '');
       if (item.weightType === 'lr') return item.sets.every(set => set.weight !== '' && set.lReps !== '' && set.rReps !== '');
       return item.sets.every(set => set.weight !== '' && set.reps !== '');
     });
@@ -1608,13 +1845,11 @@ function EditWorkoutModal({ post, gyms, exercises, onClose, onSave }) {
             </h3>
             
             <div className="space-y-4">
-              {/* 1段目: 日付（横幅いっぱい） */}
               <div>
                 <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">日付</label>
                 <input type="date" value={editDate} onChange={e => setEditDate(e.target.value)} className="w-full min-w-0 block appearance-none bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-2 py-2 text-base font-bold text-slate-700 dark:text-slate-100 focus:outline-none focus:border-emerald-500" style={{ fontSize: '16px' }} />
               </div>
               
-              {/* 2段目: 開始と終了（絶対に横並び） */}
               <div className="flex gap-2 sm:gap-3">
                 <div className="flex-1 min-w-0 overflow-hidden">
                   <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">開始</label>
@@ -1626,7 +1861,6 @@ function EditWorkoutModal({ post, gyms, exercises, onClose, onSave }) {
                 </div>
               </div>
 
-              {/* 3段目: 体重と体脂肪率（絶対に横並び） */}
               <div className="flex gap-2 sm:gap-3">
                 <div className="flex-1 min-w-0 overflow-hidden">
                   <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">体重 (kg)</label>
@@ -1658,6 +1892,7 @@ function EditWorkoutModal({ post, gyms, exercises, onClose, onSave }) {
                addDropSet={addDropSet} 
                removeDropSet={removeDropSet} 
                updateDropSet={updateDropSetField}
+               myPastPosts={myPastPosts}
              />
           ))}
 
@@ -1787,6 +2022,7 @@ function ExercisesView({ gyms, exercises }) {
                           <label className={`text-center py-2 rounded-lg text-sm font-bold border cursor-pointer ${editExWeightType === 'plate' ? 'bg-emerald-500 text-white border-emerald-600' : 'bg-white dark:bg-slate-900 border-emerald-200 dark:border-emerald-800 text-slate-600 dark:text-slate-300'}`}><input type="radio" value="plate" checked={editExWeightType === 'plate'} onChange={(e) => setEditExWeightType(e.target.value)} className="hidden"/>20kgプレート (枚)</label>
                           <label className={`text-center py-2 rounded-lg text-sm font-bold border cursor-pointer ${editExWeightType === 'lr' ? 'bg-emerald-500 text-white border-emerald-600' : 'bg-white dark:bg-slate-900 border-emerald-200 dark:border-emerald-800 text-slate-600 dark:text-slate-300'}`}><input type="radio" value="lr" checked={editExWeightType === 'lr'} onChange={(e) => setEditExWeightType(e.target.value)} className="hidden"/>片側種目 (kg)</label>
                           <label className={`text-center py-2 rounded-lg text-sm font-bold border cursor-pointer ${editExWeightType === 'bodyWeight' ? 'bg-emerald-500 text-white border-emerald-600' : 'bg-white dark:bg-slate-900 border-emerald-200 dark:border-emerald-800 text-slate-600 dark:text-slate-300'}`}><input type="radio" value="bodyWeight" checked={editExWeightType === 'bodyWeight'} onChange={(e) => setEditExWeightType(e.target.value)} className="hidden"/>自重種目(+kg,-kg)</label>
+                          <label className={`text-center py-2 rounded-lg text-sm font-bold border cursor-pointer ${editExWeightType === 'cardio' ? 'bg-cyan-500 text-white border-cyan-600' : 'bg-white dark:bg-slate-900 border-cyan-200 dark:border-cyan-800 text-cyan-600 dark:text-cyan-300'}`}><input type="radio" value="cardio" checked={editExWeightType === 'cardio'} onChange={(e) => setEditExWeightType(e.target.value)} className="hidden"/>有酸素(距離/時間/kcal)</label>
                        </div>
                     </div>
                     <button type="submit" disabled={!editExName.trim()} className="w-full bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold py-3 rounded-xl mt-2 transition-colors disabled:opacity-50 shadow-md">更新して保存</button>
@@ -1824,6 +2060,7 @@ function ExercisesView({ gyms, exercises }) {
                           <label className={`text-center py-2 rounded-lg text-sm font-bold border cursor-pointer ${newExWeightType === 'plate' ? 'bg-emerald-50 dark:bg-emerald-950 border-emerald-500 text-emerald-600 dark:text-emerald-400' : 'bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'}`}><input type="radio" value="plate" checked={newExWeightType === 'plate'} onChange={(e) => setNewExWeightType(e.target.value)} className="hidden"/>プレートロード(枚)</label>
                           <label className={`text-center py-2 rounded-lg text-sm font-bold border cursor-pointer ${newExWeightType === 'lr' ? 'bg-emerald-50 dark:bg-emerald-950 border-emerald-500 text-emerald-600 dark:text-emerald-400' : 'bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'}`}><input type="radio" value="lr" checked={newExWeightType === 'lr'} onChange={(e) => setNewExWeightType(e.target.value)} className="hidden"/>片側種目 (kg)</label>
                           <label className={`text-center py-2 rounded-lg text-sm font-bold border cursor-pointer ${newExWeightType === 'bodyWeight' ? 'bg-emerald-50 dark:bg-emerald-950 border-emerald-500 text-emerald-600 dark:text-emerald-400' : 'bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'}`}><input type="radio" value="bodyWeight" checked={newExWeightType === 'bodyWeight'} onChange={(e) => setNewExWeightType(e.target.value)} className="hidden"/>自重種目(+kg,-kg)</label>
+                          <label className={`text-center py-2 rounded-lg text-sm font-bold border cursor-pointer ${newExWeightType === 'cardio' ? 'bg-cyan-50 dark:bg-cyan-950 border-cyan-500 text-cyan-600 dark:text-cyan-400' : 'bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'}`}><input type="radio" value="cardio" checked={newExWeightType === 'cardio'} onChange={(e) => setNewExWeightType(e.target.value)} className="hidden"/>有酸素(距離/時間/kcal)</label>
                        </div>
                     </div>
                     <button type="submit" disabled={isAdding || !newExName.trim()} className="w-full bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-bold py-3 rounded-xl mt-2 transition-colors disabled:opacity-50">リストに追加</button>
@@ -1852,7 +2089,7 @@ function ExercisesView({ gyms, exercises }) {
                                 <div className="flex gap-2 mt-1">
                                   {ex.maker && <span className="text-xs text-slate-400 dark:text-slate-500 font-bold bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded">{ex.maker}</span>}
                                   {ex.weightType && <span className="text-[10px] text-emerald-500 dark:text-emerald-400 font-bold bg-emerald-50 dark:bg-emerald-950/50 px-1.5 py-0.5 rounded border border-emerald-100 dark:border-emerald-900">
-                                    {ex.weightType === 'oneSide' ? '片側(kg)' : ex.weightType === 'plate' ? 'プレートロード(枚)' : ex.weightType === 'lr' ? '片側種目' : ex.weightType === 'bodyWeight' ? '加重/アシスト' : '合計(kg)'}
+                                    {ex.weightType === 'oneSide' ? '片側(kg)' : ex.weightType === 'plate' ? 'プレートロード(枚)' : ex.weightType === 'lr' ? '片側種目' : ex.weightType === 'bodyWeight' ? '加重/アシスト' : ex.weightType === 'cardio' ? '有酸素(距離/時間/kcal)' : '合計(kg)'}
                                   </span>}
                                 </div>
                               </div>
@@ -1909,6 +2146,9 @@ function FriendsView({ partnerName, partnerInfo, currentUser, posts }) {
   const myPercent = Math.min(100, (myMonthVolume / targetVolume) * 100);
   const partnerPercent = Math.min(100 - myPercent, (partnerMonthVolume / targetVolume) * 100);
 
+  const lastPartnerFat = partnerPosts.find(p => p.bodyFat);
+  const partnerCompositionInfo = { ...partnerInfo, lastFat: lastPartnerFat ? lastPartnerFat.bodyFat : null };
+
   return (
     <div className="space-y-6">
       <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-6">パートナー</h2>
@@ -1933,7 +2173,10 @@ function FriendsView({ partnerName, partnerInfo, currentUser, posts }) {
           )}
 
           {isTraining ? (
-            <div className="mt-4 inline-flex items-center gap-2 bg-black/30 px-4 py-2 rounded-full text-sm font-bold backdrop-blur-sm"><Flame size={16} className="text-amber-300 animate-pulse" /> トレーニング中 <TimerDisplay startTime={partnerInfo.trainingStartTime} /></div>
+            <div className="mt-4 flex flex-col items-center gap-1.5 bg-black/30 px-4 py-2.5 rounded-2xl text-sm font-bold backdrop-blur-sm">
+                <div className="flex items-center gap-2"><Flame size={16} className="text-amber-300 animate-pulse" /> トレーニング中 <TimerDisplay startTime={partnerInfo.trainingStartTime} /></div>
+                {partnerInfo.currentExerciseName && <div className="text-[10px] text-amber-100 opacity-90 border-t border-white/20 pt-1 mt-1 w-full text-center">現在: {partnerInfo.currentExerciseName}</div>}
+            </div>
           ) : isOnline ? (
             <div className="mt-4 inline-flex items-center gap-2 bg-black/30 px-4 py-1.5 rounded-full text-sm font-bold backdrop-blur-sm"><Circle fill="currentColor" size={10} className="text-emerald-300 animate-pulse" /> オンライン</div>
           ) : (
@@ -1941,6 +2184,8 @@ function FriendsView({ partnerName, partnerInfo, currentUser, posts }) {
           )}
         </div>
       </div>
+
+      <BodyCompositionInfo info={partnerCompositionInfo} />
 
       <div className="bg-gradient-to-br from-indigo-600 to-purple-600 rounded-3xl p-6 text-white shadow-lg relative overflow-hidden">
          <div className="absolute top-2 right-2 text-white/20"><Trophy size={80}/></div>
@@ -1993,7 +2238,6 @@ function FriendsView({ partnerName, partnerInfo, currentUser, posts }) {
       </div>
     </div>
   );
-  
 }
 
 // --- ナビゲーションボタン ---
