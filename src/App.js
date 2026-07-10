@@ -1037,7 +1037,7 @@ export default function App() {
         {currentTab === 'exercises' && <ExercisesView gyms={allGyms} exercises={exercises} />}
         {currentTab === 'record' && <RecordView onStart={handleStartTraining} onPost={handlePostWorkout} onCancel={handleCancelTraining} myInfo={myInfo} gyms={allGyms} exercises={exercises} workoutItems={draftWorkoutItems} setWorkoutItems={setDraftWorkoutItems} posts={posts} />}
         {currentTab === 'data' && <DataView posts={posts} currentUser={currentUser} partnerName={partnerName} accountsInfo={accountsInfo} onEdit={setEditingPost} onDelete={handleDeleteWorkout} onImport={handleImportWorkout} />}
-        {currentTab === 'friends' && <FriendsView partnerName={partnerName} partnerInfo={partnerInfo} currentUser={currentUser} posts={posts} />}
+        {currentTab === 'friends' && <FriendsView partnerName={partnerName} partnerInfo={partnerInfo} currentUser={currentUser} posts={posts} accountsInfo={accountsInfo} />}
       </main>
 
       {editingPost && <EditWorkoutModal post={editingPost} gyms={allGyms} exercises={exercises} onClose={() => setEditingPost(null)} onSave={handleUpdateWorkout} myPastPosts={posts.filter(p => p.author === currentUser)} />}
@@ -2185,7 +2185,7 @@ function ExercisesView({ gyms, exercises }) {
 }
 
 // --- パートナー画面 ---
-function FriendsView({ partnerName, partnerInfo, currentUser, posts }) {
+function FriendsView({ partnerName, partnerInfo, currentUser, posts, accountsInfo }) {
   const isTraining = partnerInfo?.isTraining;
   const lastActive = partnerInfo?.lastActive || 0;
   const isOnline = !isTraining && (Date.now() - lastActive < 300000);
