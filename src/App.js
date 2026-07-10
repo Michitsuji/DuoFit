@@ -1490,7 +1490,7 @@ function DataView({ posts, currentUser, partnerName, accountsInfo, onEdit, onDel
   
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDateStr, setSelectedDateStr] = useState(formatDateFromTimestamp(Date.now()));
-  const [reportTab, setReportTab] = useState(currentUser);
+  const [postsTab, setPostsTab] = useState(currentUser); // 記録の切り替えタブ
   
   const year = currentMonth.getFullYear();
   const month = currentMonth.getMonth();
@@ -1527,7 +1527,8 @@ function DataView({ posts, currentUser, partnerName, accountsInfo, onEdit, onDel
   const weightData = myPosts.filter(p => p.bodyWeight && !isNaN(p.bodyWeight)).map(p => ({ date: p.date, value: Number(p.bodyWeight) })).reverse();
   const fatData = myPosts.filter(p => p.bodyFat && !isNaN(p.bodyFat)).map(p => ({ date: p.date, value: Number(p.bodyFat) })).reverse();
 
-  const selectedPosts = posts.filter(p => formatDateFromTimestamp(p.timestamp) === selectedDateStr);
+  // ★選択したタブ（自分/相手）の投稿だけを抽出
+  const selectedPosts = posts.filter(p => p.author === postsTab && formatDateFromTimestamp(p.timestamp) === selectedDateStr);
 
   const myInfo = accountsInfo[currentUser] || {};
   const lastFatPost = myPosts.find(p => p.bodyFat);
@@ -1562,7 +1563,13 @@ function DataView({ posts, currentUser, partnerName, accountsInfo, onEdit, onDel
       
       {selectedDateStr && (
         <div className="pt-2 animate-in fade-in">
-          <h3 className="text-sm font-bold text-slate-500 dark:text-slate-400 mb-4">{selectedDateStr.replace(/-/g, '/')} の記録</h3>
+          <h3 className="text-sm font-bold text-slate-500 dark:text-slate-400 mb-3">{selectedDateStr.replace(/-/g, '/')} の記録</h3>
+          
+          <div className="flex bg-slate-200 dark:bg-slate-800 p-1 rounded-xl mb-4">
+            <button onClick={() => setPostsTab(currentUser)} className={`flex-1 py-2 text-sm font-bold text-center rounded-lg transition-colors ${postsTab === currentUser ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'}`}>{currentUser}</button>
+            <button onClick={() => setPostsTab(partnerName)} className={`flex-1 py-2 text-sm font-bold text-center rounded-lg transition-colors ${postsTab === partnerName ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'}`}>{partnerName}</button>
+          </div>
+
           {selectedPosts.length > 0 ? (
             selectedPosts.map(post => <WorkoutCard key={post.id} post={post} currentUser={currentUser} accountsInfo={accountsInfo} onEdit={onEdit} onDelete={onDelete} onImport={onImport} />)
           ) : (
