@@ -1603,29 +1603,36 @@ function EditWorkoutModal({ post, gyms, exercises, onClose, onSave }) {
         
         <div className="flex-1 overflow-y-auto p-4 space-y-6 pb-24">
           <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-sm mb-6 space-y-4">
-            <h3 className="text-sm font-bold text-slate-700 dark:text-slate-300 flex items-center gap-2"><Settings size={16} className="text-slate-400" /> トレーニング情報</h3>
+            <h3 className="text-sm font-bold text-slate-700 dark:text-slate-300 flex items-center gap-2">
+              <Settings size={16} className="text-slate-400" /> トレーニング情報
+            </h3>
             
-            <div className="flex flex-col gap-3">
+            <div className="space-y-4">
+              {/* 1段目: 日付（横幅いっぱい） */}
               <div>
                 <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">日付</label>
                 <input type="date" value={editDate} onChange={e => setEditDate(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-2 text-base font-bold text-slate-700 dark:text-slate-100 focus:outline-none focus:border-emerald-500" style={{ fontSize: '16px' }} />
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
+              
+              {/* 2段目: 開始と終了（絶対に横並び） */}
+              <div className="flex gap-3">
+                <div className="flex-1 min-w-0">
                   <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">開始</label>
-                  <input type="time" value={editStartTime} onChange={e => setEditStartTime(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-2 text-base font-bold text-slate-700 dark:text-slate-100 focus:outline-none focus:border-emerald-500" style={{ fontSize: '16px' }} />
+                  <input type="time" value={editStartTime} onChange={e => setEditStartTime(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-2 py-2 text-base font-bold text-slate-700 dark:text-slate-100 focus:outline-none focus:border-emerald-500" style={{ fontSize: '16px' }} />
                 </div>
-                <div>
+                <div className="flex-1 min-w-0">
                   <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">終了</label>
-                  <input type="time" value={editEndTime} onChange={e => setEditEndTime(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-2 text-base font-bold text-slate-700 dark:text-slate-100 focus:outline-none focus:border-emerald-500" style={{ fontSize: '16px' }} />
+                  <input type="time" value={editEndTime} onChange={e => setEditEndTime(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-2 py-2 text-base font-bold text-slate-700 dark:text-slate-100 focus:outline-none focus:border-emerald-500" style={{ fontSize: '16px' }} />
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
+
+              {/* 3段目: 体重と体脂肪率（絶対に横並び） */}
+              <div className="flex gap-3">
+                <div className="flex-1 min-w-0">
                   <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">体重 (kg)</label>
                   <input type="number" step="0.1" value={editBodyWeight} onChange={e => setEditBodyWeight(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-2 text-base font-bold text-slate-700 dark:text-slate-100 focus:outline-none focus:border-emerald-500" style={{ fontSize: '16px' }} />
                 </div>
-                <div>
+                <div className="flex-1 min-w-0">
                   <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">体脂肪率 (%)</label>
                   <input type="number" step="0.1" value={editBodyFat} onChange={e => setEditBodyFat(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-2 text-base font-bold text-slate-700 dark:text-slate-100 focus:outline-none focus:border-emerald-500" style={{ fontSize: '16px' }} />
                 </div>
