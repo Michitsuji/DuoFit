@@ -303,7 +303,14 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
   const displayVolumeCalc = (!post.items || post.items.length === 0) ? 0 : ((post.volume && post.volume > 0) ? post.volume : totalVolume);
   const displayCalories = (!post.items || post.items.length === 0) ? 0 : ((post.calories && post.calories > 0) ? post.calories : totalCalories);
   const displaySets = post.totalSets || processedItems.reduce((acc, it) => acc + (it.sets?.length || 0), 0);
-  const categories = Array.from(new Set(processedItems.map(item => item.category).filter(Boolean)));
+  
+  const categoryCounts = {};
+  processedItems.forEach(item => {
+    if (item.category) {
+      categoryCounts[item.category] = (categoryCounts[item.category] || 0) + (item.sets?.length || 0);
+    }
+  });
+  const categories = Object.keys(categoryCounts).sort((a, b) => categoryCounts[b] - categoryCounts[a]);
 
   const renderSetRow = (setObj, wType, type, isDrop, label) => {
     const isLR = wType === 'lr';
@@ -922,6 +929,7 @@ export default function App() {
   const isFullyLoaded = Object.values(dataLoaded).every(Boolean) || loadTimeout;
   const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
   const [draftWorkoutItems, setDraftWorkoutItems] = useState([]);
+  const [selectedCategories, setSelectedCategories] = useState([]);
   const [editingPost, setEditingPost] = useState(null);
   const [showProfileModal, setShowProfileModal] = useState(false);
 
@@ -1277,7 +1285,7 @@ export default function App() {
       <main className="p-4 max-w-md mx-auto w-full pb-40">
         {currentTab === 'timeline' && <TimelineView posts={posts} onToggleLike={toggleLike} onImport={handleImportWorkout} currentUser={currentUser} onDelete={handleDeleteWorkout} onEdit={setEditingPost} accountsInfo={accountsInfo} />}
         {currentTab === 'exercises' && <ExercisesView gyms={allGyms} exercises={exercises} posts={posts} accountsInfo={accountsInfo} />}
-        {currentTab === 'record' && <RecordView onStart={handleStartTraining} onPost={handlePostWorkout} onCancel={handleCancelTraining} myInfo={myInfo} gyms={allGyms} exercises={exercises} workoutItems={draftWorkoutItems} setWorkoutItems={setDraftWorkoutItems} posts={posts} currentUser={currentUser} isManual={isRecordManual} setIsManual={setIsRecordManual} />}
+        {currentTab === 'record' && <RecordView onStart={handleStartTraining} onPost={handlePostWorkout} onCancel={handleCancelTraining} myInfo={myInfo} gyms={allGyms} exercises={exercises} workoutItems={draftWorkoutItems} setWorkoutItems={setDraftWorkoutItems} selectedCategories={selectedCategories} setSelectedCategories={setSelectedCategories} posts={posts} currentUser={currentUser} isManual={isRecordManual} setIsManual={setIsRecordManual} />}
         {currentTab === 'data' && <DataView posts={posts} currentUser={currentUser} partnerName={partnerName} accountsInfo={accountsInfo} onEdit={setEditingPost} onDelete={handleDeleteWorkout} onImport={handleImportWorkout} />}
         {currentTab === 'friends' && <FriendsView partnerName={partnerName} partnerInfo={partnerInfo} currentUser={currentUser} posts={posts} accountsInfo={accountsInfo} />}
       </main>
@@ -1849,12 +1857,13 @@ function DataView({ posts, currentUser, partnerName, accountsInfo, onEdit, onDel
   );
 }
 
-// --- 記録入力画面 ---
-function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workoutItems, setWorkoutItems, posts, currentUser, isManual, setIsManual }) {
-  const [selectedGymId, setSelectedGymId] = useState(myInfo.currentGymId || (gyms.filter(g => g.id !== 'common')[0]?.id || ''));
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [selectedCategories, setSelectedCategories] = useState([]);
-  const [bodyWeight, setBodyWeight] = useState(myInfo.weight || '');
+<main className="p-4 max-w-md mx-auto w-full pb-40">
+        {currentTab === 'timeline' && <TimelineView posts={posts} onToggleLike={toggleLike} onImport={handleImportWorkout} currentUser={currentUser} onDelete={handleDeleteWorkout} onEdit={setEditingPost} accountsInfo={accountsInfo} />}
+        {currentTab === 'exercises' && <ExercisesView gyms={allGyms} exercises={exercises} posts={posts} accountsInfo={accountsInfo} />}
+        {currentTab === 'record' && <RecordView onStart={handleStartTraining} onPost={handlePostWorkout} onCancel={handleCancelTraining} myInfo={myInfo} gyms={allGyms} exercises={exercises} workoutItems={draftWorkoutItems} setWorkoutItems={setDraftWorkoutItems} selectedCategories={selectedCategories} setSelectedCategories={setSelectedCategories} posts={posts} currentUser={currentUser} isManual={isRecordManual} setIsManual={setIsRecordManual} />}
+        {currentTab === 'data' && <DataView posts={posts} currentUser={currentUser} partnerName={partnerName} accountsInfo={accountsInfo} onEdit={setEditingPost} onDelete={handleDeleteWorkout} onImport={handleImportWorkout} />}
+        {currentTab === 'friends' && <FriendsView partnerName={partnerName} partnerInfo={partnerInfo} currentUser={currentUser} posts={posts} accountsInfo={accountsInfo} />}
+      </main>
   const [bodyFat, setBodyFat] = useState('');
 
   // 過去の記録用ステート
@@ -1920,7 +1929,14 @@ function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workou
         if (item.weightType === 'cardio') {
            return { ...item, sets: [...(item.sets || []), { id: generateId(), distance: lastSet.distance || '', time: lastSet.time || '', calories: lastSet.calories || '' }]};
         }
-        return { ...item, sets: [...(item.sets || []), { id: generateId(), weight: lastSet.weight || '', reps: lastSet.reps || '', lReps: lastSet.lReps || '', rReps: lastSet.rReps || '' }]};
+        return { ...item, sets: [...(item.sets || []), { 
+          id: generateId(), 
+          weight: lastSet.weight || '', 
+          reps: lastSet.reps || '', 
+          lReps: lastSet.lReps || '', 
+          rReps: lastSet.rReps || '',
+          dropSets: lastSet.dropSets ? lastSet.dropSets.map(ds => ({ ...ds, id: generateId() })) : undefined
+        }]};
       }
       return item;
     }));
@@ -2338,6 +2354,7 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo }) {
   const [activeTab, setActiveTab] = useState('exercises'); 
   const [newGymName, setNewGymName] = useState('');
   const [selectedGymId, setSelectedGymId] = useState(gyms.length > 0 ? gyms[0].id : '');
+  const [filterGymId, setFilterGymId] = useState('all');
   const [editingGymId, setEditingGymId] = useState(null);
   const [editGymName, setEditGymName] = useState('');
   const [newExName, setNewExName] = useState('');
@@ -2571,9 +2588,18 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo }) {
               )}
 
               <div>
-                <h3 className="text-sm font-bold text-slate-500 dark:text-slate-400 mb-3 ml-1">登録済みの種目</h3>
+                <div className="flex justify-between items-center mb-3 ml-1">
+                  <h3 className="text-sm font-bold text-slate-500 dark:text-slate-400">登録済みの種目</h3>
+                  <div className="relative w-48">
+                    <select value={filterGymId} onChange={e => setFilterGymId(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-1.5 text-slate-800 dark:text-slate-100 font-bold appearance-none focus:outline-none focus:border-emerald-500 text-xs">
+                      <option value="all">すべてのジム</option>
+                      {gyms.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
+                    </select>
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none text-[10px]">▼</div>
+                  </div>
+                </div>
                 <div className="space-y-4">
-                  {gyms.map(gym => {
+                  {gyms.filter(gym => filterGymId === 'all' || gym.id === filterGymId).map(gym => {
                     const gymExercises = exercises.filter(ex => ex.gymId === gym.id).sort((a, b) => {
                       const idxA = MUSCLE_CATEGORIES.indexOf(a.category);
                       const idxB = MUSCLE_CATEGORIES.indexOf(b.category);
@@ -2624,7 +2650,7 @@ function FriendsView({ partnerName, partnerInfo, currentUser, posts, accountsInf
   const isOnline = isAppOnline && lastActive > 0 && (Date.now() - lastActive < 45000);
 
   const getTimeAgo = (timestamp) => {
-    if (!timestamp || timestamp === 0) return '記録なし';
+    if (!timestamp || timestamp === 0) return 'バックグラウンド';
     const diff = Math.max(0, Date.now() - timestamp); // 負の数を防止
     const minutes = Math.floor(diff / 60000);
     if (minutes < 1) return 'たった今';
