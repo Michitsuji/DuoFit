@@ -380,9 +380,16 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
       else { displayWeight = '自重'; weightLabel = ''; }
     }
 
+    let labelColorClass = 'text-slate-500 dark:text-slate-400';
+    if (isDrop) {
+      labelColorClass = 'text-orange-500';
+    } else if (type !== 'main') {
+      labelColorClass = 'text-purple-500 dark:text-purple-400 pl-4';
+    }
+
     return (
       <div className={`flex justify-between items-center border-b border-slate-200/50 dark:border-slate-800/50 pb-2 pt-2 last:border-0 ${isDrop ? 'pl-8' : ''}`}>
-        <span className={`font-bold w-16 text-sm shrink-0 flex flex-col ${isDrop ? 'text-orange-500' : 'text-slate-500 dark:text-slate-400'} ${type !== 'main' && !isDrop ? 'pl-4 text-indigo-500 dark:text-indigo-400' : ''}`}>
+        <span className={`font-bold w-16 text-sm shrink-0 flex flex-col ${labelColorClass}`}>
           {label}
         </span>
         {isLR ? (
@@ -1912,8 +1919,9 @@ function DataView({ posts, currentUser, partnerName, accountsInfo, onEdit, onDel
 function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workoutItems, setWorkoutItems, selectedCategories, setSelectedCategories, posts, currentUser, isManual, setIsManual }) {
   const [selectedGymId, setSelectedGymId] = useState(myInfo.currentGymId || (gyms.filter(g => g.id !== 'common')[0]?.id || ''));
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [bodyWeight, setBodyWeight] = useState(myInfo.weight || '');
+  const [bodyWeight, setBodyWeight] = useState('');
   const [bodyFat, setBodyFat] = useState('');
+  const [exerciseTypeFilter, setExerciseTypeFilter] = useState('all');
 
   // 過去の記録用ステート
   const [manualDate, setManualDate] = useState(formatDateFromTimestamp(Date.now()));
@@ -1928,6 +1936,8 @@ function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workou
 
   const availableExercises = exercises.filter(ex => {
     if (ex.gymId !== selectedGymId && ex.gymId !== 'common' && selectedGymId !== 'common') return false; 
+    if (exerciseTypeFilter === 'common' && ex.gymId !== 'common') return false;
+    if (exerciseTypeFilter === 'gym' && ex.gymId === 'common') return false;
     if (selectedCategories.length === 0) return false;
     return selectedCategories.includes(ex.category || 'その他');
   });
@@ -2054,7 +2064,7 @@ function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workou
     } else {
        await onPost(gym ? gym.name : '不明なジム', workoutItems, Number(bodyWeight), Number(bodyFat));
     }
-    setBodyWeight(myInfo.weight || ''); setBodyFat(''); setIsSubmitting(false);
+    setBodyWeight(''); setBodyFat(''); setIsSubmitting(false);
   };
 
   const handleCancel = () => {
@@ -2073,7 +2083,7 @@ function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workou
       await onPost('', [], Number(bodyWeight), Number(bodyFat), startTs, startTs);
       setIsSubmitting(false);
       setIsMetricsOnlyMode(false);
-      setBodyWeight(myInfo.weight || '');
+      setBodyWeight('');
       setBodyFat('');
   };
 
@@ -2189,6 +2199,12 @@ function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workou
       )}
 
       <h2 className="text-lg font-bold text-slate-900 dark:text-white mt-6 mb-2">{isManual ? '記録内容' : 'ワークアウト中'}</h2>
+
+      <div className="flex bg-slate-200 dark:bg-slate-800 p-1 rounded-xl mb-4">
+        <button onClick={() => setExerciseTypeFilter('all')} className={`flex-1 py-1.5 text-sm font-bold text-center rounded-lg transition-colors ${exerciseTypeFilter === 'all' ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'}`}>すべて</button>
+        <button onClick={() => setExerciseTypeFilter('common')} className={`flex-1 py-1.5 text-sm font-bold text-center rounded-lg transition-colors ${exerciseTypeFilter === 'common' ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'}`}>フリーウェイト</button>
+        <button onClick={() => setExerciseTypeFilter('gym')} className={`flex-1 py-1.5 text-sm font-bold text-center rounded-lg transition-colors ${exerciseTypeFilter === 'gym' ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'}`}>マシン等</button>
+      </div>
 
       <div className="grid grid-cols-4 gap-2 sm:gap-3 mb-6">
         {MUSCLE_CATEGORIES.map(cat => {
