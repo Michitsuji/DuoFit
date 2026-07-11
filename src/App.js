@@ -300,8 +300,8 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
       return calculateWorkoutTotals(post.items || [], post.duration, baseWeight);
   }, [post.items, post.duration, baseWeight]);
 
-  const displayVolumeCalc = (post.volume && post.volume > 0) ? post.volume : totalVolume;
-  const displayCalories = (post.calories && post.calories > 0) ? post.calories : totalCalories;
+  const displayVolumeCalc = (!post.items || post.items.length === 0) ? 0 : ((post.volume && post.volume > 0) ? post.volume : totalVolume);
+  const displayCalories = (!post.items || post.items.length === 0) ? 0 : ((post.calories && post.calories > 0) ? post.calories : totalCalories);
   const displaySets = post.totalSets || processedItems.reduce((acc, it) => acc + (it.sets?.length || 0), 0);
   const categories = Array.from(new Set(processedItems.map(item => item.category).filter(Boolean)));
 
@@ -2543,13 +2543,25 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo }) {
 function FriendsView({ partnerName, partnerInfo, currentUser, posts, accountsInfo }) {
   const isTraining = partnerInfo?.isTraining;
   const lastActive = partnerInfo?.lastActive || 0;
-  const isOnline = !isTraining && (Date.now() - lastActive < 300000);
+  const isOnline = (Date.now() - lastActive < 300000);
+
+  const getTimeAgo = (timestamp) => {
+    if (!timestamp) return '未ログイン';
+    const diff = Date.now() - timestamp;
+    const minutes = Math.floor(diff / 60000);
+    if (minutes < 1) return '数秒前';
+    if (minutes < 60) return `${minutes}分前`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours}時間前`;
+    const days = Math.floor(hours / 24);
+    return `${days}日前`;
+  };
 
   let cardGradient = 'bg-gradient-to-br from-slate-400 to-slate-500 shadow-slate-500/20'; 
   let iconBorder = 'border-slate-300';
   let badgeColor = 'bg-slate-400';
   
-  if (isTraining) { cardGradient = 'bg-gradient-to-br from-amber-500 to-orange-600 shadow-orange-500/20'; iconBorder = 'border-orange-400'; badgeColor = 'bg-orange-400'; } 
+  if (isTraining) { cardGradient = 'bg-gradient-to-br from-amber-500 to-orange-600 shadow-orange-500/20'; iconBorder = 'border-orange-400'; badgeColor = isOnline ? 'bg-amber-400' : 'bg-slate-400'; } 
   else if (isOnline) { cardGradient = 'bg-gradient-to-br from-emerald-500 to-teal-600 shadow-emerald-500/20'; iconBorder = 'border-emerald-400'; badgeColor = 'bg-emerald-400'; }
 
   const partnerPosts = posts ? posts.filter(p => p.author === partnerName) : [];
@@ -2605,7 +2617,7 @@ function FriendsView({ partnerName, partnerInfo, currentUser, posts, accountsInf
 
           {isTraining ? (
             <div className="mt-4 flex flex-col items-center gap-1.5 bg-black/30 px-4 py-2.5 rounded-2xl text-sm font-bold backdrop-blur-sm">
-                <div className="flex items-center gap-2"><Flame size={16} className="text-amber-300 animate-pulse" /> トレーニング中 <TimerDisplay startTime={partnerInfo.trainingStartTime} /></div>
+                <div className="flex items-center gap-2"><Flame size={16} className={`${isOnline ? 'text-amber-300 animate-pulse' : 'text-slate-400'}`} /> トレーニング中 {isOnline ? '(オンライン)' : '(オフライン)'} <TimerDisplay startTime={partnerInfo.trainingStartTime} /></div>
                 {partnerInfo.currentExerciseName && <div className="text-[10px] text-amber-100 opacity-90 border-t border-white/20 pt-1 mt-1 w-full text-center">現在: {partnerInfo.currentExerciseName}</div>}
             </div>
           ) : isOnline ? (
@@ -2613,6 +2625,7 @@ function FriendsView({ partnerName, partnerInfo, currentUser, posts, accountsInf
           ) : (
             <div className="mt-4 inline-flex items-center gap-2 bg-black/20 px-4 py-1.5 rounded-full text-sm font-bold backdrop-blur-sm text-slate-200"><Circle fill="currentColor" size={10} className="text-slate-300" /> オフライン</div>
           )}
+          <div className="mt-2 text-xs font-bold text-white/70">最終ログイン: {getTimeAgo(lastActive)}</div>
         </div>
       </div>
 
