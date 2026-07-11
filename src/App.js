@@ -2723,16 +2723,24 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo }) {
 }
 // --- パートナー画面 ---
 function FriendsView({ partnerName, partnerInfo, currentUser, posts, accountsInfo }) {
+  const [currentTime, setCurrentTime] = useState(Date.now());
+
+  useEffect(() => {
+    // 5秒ごとに現在時刻を更新し、相手の最終アクセス時刻との差分をリアルタイムで再評価する
+    const timerId = setInterval(() => setCurrentTime(Date.now()), 5000);
+    return () => clearInterval(timerId);
+  }, []);
+
   const isTraining = partnerInfo?.isTraining;
   const lastActive = partnerInfo?.lastActive || 0;
   
   // フラグがtrue、かつ45秒以内に通信がある場合のみオンラインとする
   const isAppOnline = partnerInfo?.isAppOnline !== false;
-  const isOnline = isAppOnline && lastActive > 0 && (Date.now() - lastActive < 45000);
+  const isOnline = isAppOnline && lastActive > 0 && (currentTime - lastActive < 45000);
 
   const getTimeAgo = (timestamp) => {
     if (!timestamp || timestamp === 0) return 'バックグラウンド';
-    const diff = Math.max(0, Date.now() - timestamp); // 負の数を防止
+    const diff = Math.max(0, currentTime - timestamp); // 負の数を防止
     const minutes = Math.floor(diff / 60000);
     if (minutes < 1) return 'たった今';
     if (minutes < 60) return `${minutes}分前`;
