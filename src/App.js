@@ -1112,10 +1112,10 @@ export default function App() {
     if (!accountData || !accountData.pin) {
       const defaultGender = userId === '勇太' ? 'male' : 'female';
       const defaultBirthDate = userId === '勇太' ? '2002-08-26' : '';
-      try { await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', userId), { pin: pin, isTraining: false, lastActive: Date.now(), theme: 'light', gender: defaultGender, birthDate: defaultBirthDate }, { merge: true }); setCurrentUser(userId); } catch (e) {}
+      try { await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', userId), { pin: pin, isTraining: false, lastActive: Date.now(), isAppOnline: true, theme: 'light', gender: defaultGender, birthDate: defaultBirthDate }, { merge: true }); setCurrentUser(userId); } catch (e) {}
     } else if (accountData.pin === pin) {
       setCurrentUser(userId);
-      try { await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', userId), { lastActive: Date.now() }, { merge: true }); } catch (e) {}
+      try { await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', userId), { lastActive: Date.now(), isAppOnline: true }, { merge: true }); } catch (e) {}
     } else { return false; }
     return true;
   };
@@ -2819,7 +2819,9 @@ function FriendsView({ partnerName, partnerInfo, currentUser, posts, accountsInf
             <div className="mt-4 inline-flex items-center gap-2 bg-black/20 px-4 py-1.5 rounded-full text-sm font-bold backdrop-blur-sm text-slate-200"><Circle fill="currentColor" size={10} className="text-slate-300" /> オフライン</div>
           )}
           {!isOnline && (
-            <div className="mt-2 text-xs font-bold text-white/70">最終ログイン: {getTimeAgo(lastActive)}</div>
+            <div className="mt-2 text-xs font-bold text-white/70">
+              {getTimeAgo(lastActive) === 'バックグラウンド' ? 'バックグラウンド' : `最終ログイン: ${getTimeAgo(lastActive)}`}
+            </div>
           )}
         </div>
       </div>
