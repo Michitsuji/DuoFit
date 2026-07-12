@@ -1899,8 +1899,11 @@ function DataView({ posts, currentUser, partnerName, accountsInfo, onEdit, onDel
   return (
     <div className="space-y-6">
       <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-6">データ</h2>
-      
-      <BodyCompositionInfo info={myCompositionInfo} dailyCalories={myDailyCalories} dateLabel={dateLabel} />
+
+      <div>
+        <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4">月間レポート ({month + 1}月)</h3>
+        <MonthlyReport monthDate={currentMonth} posts={posts} userName={currentUser} accountsInfo={accountsInfo} />
+      </div>
 
       <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
         <div className="flex justify-between items-center mb-4">
@@ -1936,12 +1939,12 @@ function DataView({ posts, currentUser, partnerName, accountsInfo, onEdit, onDel
         </div>
       )}
 
-      <div>
-        <h3 className="text-lg font-bold text-slate-900 dark:text-white mt-8 mb-4">月間レポート ({month + 1}月)</h3>
-        <MonthlyReport monthDate={currentMonth} posts={posts} userName={currentUser} accountsInfo={accountsInfo} />
+      <div className="pt-4">
+        <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4">体組成データ</h3>
+        <BodyCompositionInfo info={myCompositionInfo} dailyCalories={myDailyCalories} dateLabel={dateLabel} />
       </div>
 
-      <div className="space-y-6 pt-8">
+      <div className="space-y-6 pt-4">
          <h3 className="text-lg font-bold text-slate-900 dark:text-white">体重・体脂肪率の推移</h3>
          <SimpleChart data={weightData} color="#10b981" title={`${currentUser}の体重推移 (kg)`} />
          <SimpleChart data={fatData} color="#6366f1" title={`${currentUser}の体脂肪率推移 (%)`} />
@@ -2965,7 +2968,7 @@ function FriendsView({ partnerName, partnerInfo, currentUser, posts, accountsInf
       </div>
 
       <div className="mt-12 text-center pb-4 border-t border-slate-200/50 dark:border-slate-800/50 pt-6">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">DuoFit v2.0.0 (2026.7.12, 17:58, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">DuoFit v2.0.0 (2026.7.12, 19:39, updated)</p>
         <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 mt-1">© 2026 Yuta Michitsuji. All rights reserved.</p>
       </div>
     </div>
