@@ -2291,10 +2291,16 @@ function EditWorkoutModal({ post, gyms, exercises, onClose, onSave, myPastPosts 
   const [editEndTime, setEditEndTime] = useState(formatTimeFromTimestamp(post.endTime || post.timestamp));
   const [editBodyWeight, setEditBodyWeight] = useState(post.bodyWeight || '');
   const [editBodyFat, setEditBodyFat] = useState(post.bodyFat || '');
+  const [selectedCategories, setSelectedCategories] = useState([]);
+
+  const toggleCategory = (cat) => setSelectedCategories(prev => prev.includes(cat) ? prev.filter(c => c !== cat) : [...prev, cat]);
 
   const availableExercises = exercises.filter(ex => {
     const gym = gyms.find(g => g.name === post.gymName);
-    return gym ? (ex.gymId === gym.id || ex.gymId === 'common') : true;
+    const isGymMatch = gym ? (ex.gymId === gym.id || ex.gymId === 'common') : true;
+    if (!isGymMatch) return false;
+    if (selectedCategories.length === 0) return false;
+    return selectedCategories.includes(ex.category || 'その他');
   });
 
   const updateItem = (itemId, data) => setWorkoutItems(prev => prev.map(item => item.id === itemId ? { ...item, ...data } : item));
@@ -2392,6 +2398,20 @@ function EditWorkoutModal({ post, gyms, exercises, onClose, onSave, myPastPosts 
               </div>
             </div>
           </div>
+
+          <div className="grid grid-cols-4 gap-2 sm:gap-3 mb-6">
+            {MUSCLE_CATEGORIES.map(cat => {
+              const isSelected = selectedCategories.includes(cat);
+              return <button key={cat} onClick={() => toggleCategory(cat)} className={`py-2.5 px-1 rounded-xl text-sm font-bold transition-all border ${getCategoryTabColor(cat, isSelected)}`}>{cat}</button>;
+            })}
+          </div>
+
+          {selectedCategories.length > 0 && availableExercises.length === 0 && (
+            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 text-center shadow-sm mb-4">
+              <p className="text-slate-500 dark:text-slate-400 mb-2 text-sm font-bold">この部位に該当する種目がありません。</p>
+              <p className="text-slate-400 dark:text-slate-500 text-xs font-bold">種目タブから追加してください。</p>
+            </div>
+          )}
 
           {workoutItems.map((item, index) => (
              <WorkoutItemForm 
