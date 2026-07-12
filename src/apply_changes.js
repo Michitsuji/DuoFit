@@ -60,7 +60,7 @@ try {
     });
 
     // ファイルを削除せず、中身を空の配列にリセットする
-    fs.writeFileSync(changesFile, '[\n  \n]', 'utf8');
+    fs.writeFileSync(changesFile, '', 'utf8');
     console.log('changes.json の中身をリセットしました。');
 
 } catch (e) {
