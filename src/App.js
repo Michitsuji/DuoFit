@@ -1187,15 +1187,17 @@ export default function App() {
     const totalSets = processedItems.reduce((acc, it) => acc + (it.sets?.length || 0), 0);
 
     const newDocId = `workout_${generateId()}`;
+    // Firebaseの保存エラーを防ぐため、undefinedプロパティを削除
+    const cleanItems = JSON.parse(JSON.stringify(processedItems));
     try {
-      setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'workouts', newDocId), {
-        author: currentUser, gymName, items: processedItems, timestamp: timestamp, startTime, endTime, duration, date: dateIso, likes: 0, likedByMe: false, bodyWeight: bodyWeight || null, bodyFat: bodyFat || null, volume: totalVolume, calories: totalCalories, totalSets: totalSets
+      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'workouts', newDocId), {
+        author: currentUser, gymName, items: cleanItems, timestamp: timestamp, startTime, endTime, duration, date: dateIso, likes: 0, likedByMe: false, bodyWeight: bodyWeight || null, bodyFat: bodyFat || null, volume: totalVolume, calories: totalCalories, totalSets: totalSets
       });
       if (!manualStart) {
-        setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), { isTraining: false, trainingStartTime: null, currentGymId: null, currentExerciseName: '', lastActive: Date.now() }, { merge: true });
+        await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), { isTraining: false, trainingStartTime: null, currentGymId: null, currentExerciseName: '', lastActive: Date.now() }, { merge: true });
       }
       setDraftWorkoutItems([]); setCurrentTab('timeline');
-    } catch (e) {}
+    } catch (e) { console.error("Post error:", e); }
   };
 
 
@@ -1203,7 +1205,9 @@ export default function App() {
     if (!currentUser || !db) return;
     const { processedItems, totalVolume, totalCalories } = calculateWorkoutTotals(updatedData.items, updatedData.duration, updatedData.bodyWeight);
     const totalSets = processedItems.reduce((acc, it) => acc + (it.sets?.length || 0), 0);
-    try { await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'workouts', postId), { ...updatedData, items: processedItems, volume: totalVolume, calories: totalCalories, totalSets: totalSets }, { merge: true }); setEditingPost(null); } catch (e) {}
+    // Firebaseの保存エラーを防ぐため、undefinedプロパティを削除
+    const cleanItems = JSON.parse(JSON.stringify(processedItems));
+    try { await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'workouts', postId), { ...updatedData, items: cleanItems, volume: totalVolume, calories: totalCalories, totalSets: totalSets }, { merge: true }); setEditingPost(null); } catch (e) { console.error("Update error:", e); }
   };
 
   const handleDeleteWorkout = async (postId) => {
@@ -2056,8 +2060,8 @@ function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workou
       const isValid = workoutItems.every(item => {
         if (!item.exerciseName || !item.sets || item.sets.length === 0) return false;
         if (item.weightType === 'cardio') return item.sets.every(set => set.distance !== '' || set.time !== '' || set.calories !== '');
-        if (item.weightType === 'lr') return item.sets.every(set => set.weight !== '' && set.lReps !== '' && set.rReps !== '');
-        return item.sets.every(set => set.weight !== '' && set.reps !== '');
+        if (item.weightType === 'lr') return item.sets.every(set => (set.weight !== '' || item.weightType === 'bodyWeight') && (set.lReps !== '' || set.rReps !== ''));
+        return item.sets.every(set => (set.weight !== '' || item.weightType === 'bodyWeight') && (set.reps !== '' || set.forcedReps));
       });
       if (!isValid) { alert("種目を選択し、すべての入力を完了してください。"); return; }
     } else if (!bodyWeight && !bodyFat) {
@@ -2067,15 +2071,18 @@ function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workou
     setIsSubmitting(true);
     const gym = gyms.find(g => g.id === selectedGymId);
     
-    if (isManual) {
-       const startTs = new Date(`${manualDate}T${manualStartTime}`).getTime();
-       const endTs = new Date(`${manualDate}T${manualEndTime}`).getTime();
-       await onPost(gym ? gym.name : '不明なジム', workoutItems, Number(bodyWeight), Number(bodyFat), startTs, endTs);
-       setIsManual(false);
-    } else {
-       await onPost(gym ? gym.name : '不明なジム', workoutItems, Number(bodyWeight), Number(bodyFat));
+    try {
+      if (isManual) {
+         const startTs = new Date(`${manualDate}T${manualStartTime}`).getTime();
+         const endTs = new Date(`${manualDate}T${manualEndTime}`).getTime();
+         await onPost(gym ? gym.name : '不明なジム', workoutItems, Number(bodyWeight), Number(bodyFat), startTs, endTs);
+         setIsManual(false);
+      } else {
+         await onPost(gym ? gym.name : '不明なジム', workoutItems, Number(bodyWeight), Number(bodyFat));
+      }
+    } finally {
+      setBodyWeight(''); setBodyFat(''); setIsSubmitting(false);
     }
-    setBodyWeight(''); setBodyFat(''); setIsSubmitting(false);
   };
 
   const handleCancel = () => {
@@ -2321,8 +2328,8 @@ function EditWorkoutModal({ post, gyms, exercises, onClose, onSave, myPastPosts 
     const isValid = workoutItems.every(item => {
       if (!item.exerciseName || !item.sets || item.sets.length === 0) return false;
       if (item.weightType === 'cardio') return item.sets.every(set => set.distance !== '' || set.time !== '' || set.calories !== '');
-      if (item.weightType === 'lr') return item.sets.every(set => set.weight !== '' && set.lReps !== '' && set.rReps !== '');
-      return item.sets.every(set => set.weight !== '' && set.reps !== '');
+      if (item.weightType === 'lr') return item.sets.every(set => (set.weight !== '' || item.weightType === 'bodyWeight') && (set.lReps !== '' || set.rReps !== ''));
+      return item.sets.every(set => (set.weight !== '' || item.weightType === 'bodyWeight') && (set.reps !== '' || set.forcedReps));
     });
     if (!isValid || workoutItems.length === 0) { alert("種目を選択し、すべての重量と回数を入力してください。"); return; }
 
