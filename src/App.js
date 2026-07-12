@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Heart, Home, PlusCircle, Users, Dumbbell, LogOut, Activity, Flame, Lock, Settings, Trash2, Plus, X, ListPlus, MapPin, Clock, Play, Circle, Edit2, KeyRound, AlignLeft, Scale, Calendar as CalendarIcon, Zap, TrendingDown, Copy, Moon, Sun, Target, Trophy, ArrowUp, ArrowDown, Award, Droplet, Contrast } from 'lucide-react';
+import { Heart, Home, PlusCircle, Users, Dumbbell, LogOut, Activity, Flame, Lock, Settings, Trash2, Plus, X, ListPlus, MapPin, Clock, Play, Circle, Edit2, KeyRound, AlignLeft, Scale, Calendar as CalendarIcon, Zap, TrendingDown, Copy, Moon, Sun, Target, Trophy, ArrowUp, ArrowDown, Award, Droplet, Sparkles } from 'lucide-react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
 import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot, enableIndexedDbPersistence, getDoc, deleteField, limit, query, orderBy } from 'firebase/firestore';
@@ -1319,7 +1319,7 @@ export default function App() {
   const isSameGym = Boolean(myInfo.isTraining && partnerIsTraining && myInfo.currentGymId && partnerInfo?.currentGymId && (myInfo.currentGymId === partnerInfo.currentGymId));
   
   const isDarkMode = ['dark', 'ocean', 'mono'].includes(myInfo.theme);
-  const themeContainerClass = myInfo.theme === 'ocean' ? 'theme-ocean' : myInfo.theme === 'mono' ? 'theme-mono' : '';
+  const themeContainerClass = myInfo.theme === 'ocean' ? 'theme-ocean' : myInfo.theme === 'pop' ? 'theme-pop' : '';
 
   return (
     <div className={`min-h-screen font-sans pb-32 overflow-x-hidden selection:bg-emerald-200 transition-colors duration-300 ${isDarkMode ? 'dark bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-800'} ${themeContainerClass}`}>
@@ -1336,10 +1336,45 @@ export default function App() {
           .theme-ocean .text-slate-400 { color: #7dd3fc !important; }
         `}</style>
       )}
-      {myInfo.theme === 'mono' && (
+      {myInfo.theme === 'pop' && (
         <style>{`
-          .theme-mono > :not(style) {
-            filter: grayscale(100%);
+          .theme-pop, .theme-pop.dark, .theme-pop .bg-slate-950 {
+            background-color: #fef9c3 !important;
+          }
+          .theme-pop .bg-white, .theme-pop .bg-slate-900 {
+            background-color: #ffffff !important;
+            border-color: #fbcfe8 !important;
+            border-width: 2px !important;
+          }
+          .theme-pop .border-slate-200, .theme-pop .border-slate-800 {
+            border-color: #fbcfe8 !important;
+            border-width: 2px !important;
+          }
+          .theme-pop .text-emerald-500, .theme-pop .text-emerald-400, .theme-pop .text-emerald-600 {
+            color: #ec4899 !important;
+          }
+          .theme-pop .bg-emerald-500 {
+            background-color: #ec4899 !important;
+            color: white !important;
+          }
+          .theme-pop .border-emerald-500, .theme-pop .border-emerald-100 {
+            border-color: #ec4899 !important;
+          }
+          .theme-pop .ring-emerald-500 {
+            --tw-ring-color: #ec4899 !important;
+          }
+          .theme-pop .shadow-emerald-500\\/30 {
+            --tw-shadow-color: rgba(236, 72, 153, 0.4) !important;
+            --tw-shadow: var(--tw-shadow-colored) !important;
+          }
+          .theme-pop .text-slate-800, .theme-pop .text-slate-900, .theme-pop .text-white {
+            color: #831843 !important;
+          }
+          .theme-pop .text-slate-500, .theme-pop .text-slate-400 {
+            color: #0ea5e9 !important;
+          }
+          .theme-pop .bg-slate-100, .theme-pop .bg-slate-800, .theme-pop .bg-slate-50 {
+            background-color: #e0f2fe !important;
           }
         `}</style>
       )}
@@ -1516,7 +1551,7 @@ function ProfileModal({ isOpen, onClose, userInfo, onSave, currentUser }) {
                <button onClick={() => setTheme('light')} className={`flex items-center justify-center gap-2 py-2.5 text-sm font-bold rounded-lg transition-colors ${theme === 'light' ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-slate-500 dark:text-slate-400'}`}><Sun size={16}/> ライト</button>
                <button onClick={() => setTheme('dark')} className={`flex items-center justify-center gap-2 py-2.5 text-sm font-bold rounded-lg transition-colors ${theme === 'dark' ? 'bg-slate-900 dark:bg-slate-950 text-emerald-400 shadow-sm' : 'text-slate-500 dark:text-slate-400'}`}><Moon size={16}/> ダーク</button>
                <button onClick={() => setTheme('ocean')} className={`flex items-center justify-center gap-2 py-2.5 text-sm font-bold rounded-lg transition-colors ${theme === 'ocean' ? 'bg-[#0a2e4a] text-[#38bdf8] shadow-sm' : 'text-slate-500 dark:text-slate-400'}`}><Droplet size={16}/> オーシャン</button>
-               <button onClick={() => setTheme('mono')} className={`flex items-center justify-center gap-2 py-2.5 text-sm font-bold rounded-lg transition-colors ${theme === 'mono' ? 'bg-zinc-800 text-zinc-300 shadow-sm' : 'text-slate-500 dark:text-slate-400'}`}><Contrast size={16}/> モノクロ</button>
+               <button onClick={() => setTheme('pop')} className={`flex items-center justify-center gap-2 py-2.5 text-sm font-bold rounded-lg transition-colors ${theme === 'pop' ? 'bg-pink-100 border-2 border-pink-300 text-pink-500 shadow-sm' : 'text-slate-500 dark:text-slate-400'}`}><Sparkles size={16}/> ポップ</button>
              </div>
           </div>
         </div>
@@ -2968,7 +3003,7 @@ function FriendsView({ partnerName, partnerInfo, currentUser, posts, accountsInf
       </div>
 
       <div className="mt-12 text-center pb-4 border-t border-slate-200/50 dark:border-slate-800/50 pt-6">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">DuoFit v2.0.0 (2026.7.12, 19:39, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">DuoFit v2.0.0 (2026.7.12, 19:44, updated)</p>
         <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 mt-1">© 2026 Yuta Michitsuji. All rights reserved.</p>
       </div>
     </div>
