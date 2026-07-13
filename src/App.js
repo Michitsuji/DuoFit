@@ -1008,6 +1008,7 @@ export default function App() {
   const isFullyLoaded = Object.values(dataLoaded).every(Boolean) || loadTimeout;
   const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
   const [draftWorkoutItems, setDraftWorkoutItems] = useState([]);
+  const [isDraftLoaded, setIsDraftLoaded] = useState(false);
   const [selectedCategories, setSelectedCategories] = useState([]);
   const [editingPost, setEditingPost] = useState(null);
   const [showProfileModal, setShowProfileModal] = useState(false);
@@ -1026,14 +1027,18 @@ export default function App() {
           }
         } catch (e) {
           console.error("Failed to load draft", e);
+        } finally {
+          setIsDraftLoaded(true);
         }
       };
       loadDraft();
+    } else {
+      setIsDraftLoaded(false);
     }
   }, [currentUser, db]);
 
   useEffect(() => {
-    if (currentUser && db) {
+    if (currentUser && db && isDraftLoaded) {
       try {
         if (draftWorkoutItems.length > 0) {
           localStorage.setItem(`duofit_draft_${currentUser}`, JSON.stringify(draftWorkoutItems));
@@ -1046,7 +1051,7 @@ export default function App() {
         console.error("Failed to save draft", e);
       }
     }
-  }, [draftWorkoutItems, currentUser, db]);
+  }, [draftWorkoutItems, currentUser, db, isDraftLoaded]);
 
   useEffect(() => {
     const handleOnline = () => setIsOnline(true);
@@ -3003,7 +3008,7 @@ function FriendsView({ partnerName, partnerInfo, currentUser, posts, accountsInf
       </div>
 
       <div className="mt-12 text-center pb-4 border-t border-slate-200/50 dark:border-slate-800/50 pt-6">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">DuoFit v2.0.0 (2026.7.12, 22:36, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">DuoFit v2.0.0 (2026.7.13, 13:16, updated)</p>
         <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 mt-1">© 2026 Yuta Michitsuji. All rights reserved.</p>
       </div>
     </div>
