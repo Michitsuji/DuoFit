@@ -1,22 +1,22 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Heart, Home, PlusCircle, Users, Dumbbell, LogOut, Activity, Flame, Lock, Settings, Trash2, Plus, X, ListPlus, MapPin, Clock, Play, Circle, Edit2, KeyRound, AlignLeft, Scale, Calendar as CalendarIcon, Zap, TrendingDown, Copy, Moon, Sun, Target, Trophy, ArrowUp, ArrowDown, Award, Droplet, Sparkles, GripVertical } from 'lucide-react';
+import { Heart, Home, PlusCircle, Users, Dumbbell, LogOut, Activity, Flame, Lock, Settings, Trash2, Plus, X, ListPlus, MapPin, Clock, Play, Circle, Edit2, KeyRound, AlignLeft, Scale, Calendar as CalendarIcon, Zap, TrendingDown, Copy, Moon, Sun, Target, Trophy, ArrowUp, ArrowDown, Award, Droplet, Sparkles, GripVertical, UserPlus } from 'lucide-react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
 import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot, enableIndexedDbPersistence, getDoc, deleteField, limit, query, orderBy } from 'firebase/firestore';
 
 // --- Firebase 初期化 ---
-let app, auth, db, appId = 'duofit-app';
+let app, auth, db, appId = 'withfit-app';
 const FIREBASE_PROJECT_ID = "duofit-app-75cb2";
 
 try {
   const firebaseConfig = {
     apiKey: "AIzaSyDQTfLhyuc8PEoMtw-FvEq4k9HShRJz_io",
-    authDomain: `${FIREBASE_PROJECT_ID}.firebaseapp.com`,
-    projectId: FIREBASE_PROJECT_ID,
-    storageBucket: `${FIREBASE_PROJECT_ID}.firebasestorage.app`,
+    authDomain: "duofit-app-75cb2.firebaseapp.com",
+    projectId: "duofit-app-75cb2",
+    storageBucket: "duofit-app-75cb2.firebasestorage.app",
     messagingSenderId: "949622687026",
-    appId: "1:949622687026:web:cc870727ff41a2a22a432b",
-    measurementId: "G-D6DFPL2THK"
+    appId: "1:949622687026:web:bcc53a734a31fc1a2a432b",
+    measurementId: "G-73S4GC5XQY"
   };
   app = initializeApp(firebaseConfig);
   auth = getAuth(app);
@@ -213,7 +213,6 @@ const calculateWorkoutTotals = (items, durationMs, bodyWeight) => {
             if (set.dropSets) {
               set.dropSets.forEach(ds => { 
                 itemVolume += calcSetVolume(ds, item.weightType, baseWeight); 
-                // 旧データとの互換性
                 if (item.isSuperSet && !set.superDropSets && item.superExerciseName && ds.superWeight !== undefined) {
                    itemVolume += calcSetVolume({weight: ds.superWeight, reps: ds.superReps, lReps: ds.superLReps, rReps: ds.superRReps, forcedReps: ds.superForcedReps}, item.superWeightType, baseWeight); 
                 }
@@ -308,7 +307,18 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
   const [showImportOptions, setShowImportOptions] = useState(false);
   const isMyPost = post.author === currentUser;
   const authorInfo = accountsInfo && accountsInfo[post.author];
-  const userColor = post.author === '勇太' ? 'bg-indigo-500' : 'bg-rose-500';
+  
+  // 動的なカラー生成
+  const generateColor = (str) => {
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+      hash = str.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    const hue = Math.abs(hash) % 360;
+    return `hsl(${hue}, 70%, 50%)`;
+  };
+  const userColorBg = isMyPost ? 'bg-slate-600 dark:bg-slate-500' : 'bg-emerald-500';
+  const customBgStyle = isMyPost ? {} : { backgroundColor: post.author ? generateColor(post.author) : '#10b981' };
 
   const baseWeight = Number(post.bodyWeight) || Number(authorInfo?.weight) || 60;
   const { processedItems, totalVolume, totalCalories } = useMemo(() => {
@@ -427,11 +437,11 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
 
   return (
     <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm overflow-hidden relative mb-4">
-      <div className={`absolute top-0 left-0 w-1.5 h-full ${isMyPost ? 'bg-slate-300 dark:bg-slate-600' : 'bg-emerald-500'}`}></div>
+      <div className={`absolute top-0 left-0 w-1.5 h-full ${isMyPost ? 'bg-slate-300 dark:bg-slate-600' : ''}`} style={!isMyPost ? { backgroundColor: customBgStyle.backgroundColor } : {}}></div>
       <div className="flex justify-between items-start mb-4 pl-3">
         <div className="flex items-center gap-3 w-full overflow-hidden">
-          <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-white shadow-sm overflow-hidden shrink-0 ${isMyPost ? 'bg-slate-600 dark:bg-slate-500' : userColor}`}>
-            {authorInfo?.photoUrl ? <img src={authorInfo.photoUrl} alt={post.author} className="w-full h-full object-cover" /> : post.author ? post.author.charAt(0) : '?'}
+          <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-white shadow-sm overflow-hidden shrink-0 ${userColorBg}`} style={customBgStyle}>
+            {authorInfo?.photoUrl ? <img src={authorInfo.photoUrl} alt={post.author} className="w-full h-full object-cover" /> : post.author ? post.author.charAt(0).toUpperCase() : '?'}
           </div>
           <div className="flex-1 min-w-0">
             <p className="font-bold text-slate-800 dark:text-slate-100 truncate">{post.author || '不明'}</p>
@@ -591,8 +601,6 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
             ナイス！
           </button>
         )}
-        
-
       </div>
     </div>
   );
@@ -1128,16 +1136,13 @@ function useDragAndDrop(items, setItems) {
         const currentEl = refs.current[idx];
         if (!currentEl) return;
         
-        // 1. 折りたたみによる高さ変化分を瞬時に補正し、カーソルや指から要素が逃げないようにする
         const currentTop = currentEl.getBoundingClientRect().top;
         container.scrollBy({ top: currentTop - initialTop, behavior: 'instant' });
 
-        // 2. その後、リスト内のインデックスに応じて画面内の適切な位置にヌルっと移動させる
         setTimeout(() => {
           const rect = currentEl.getBoundingClientRect();
           const totalItems = items.length;
           
-          // 要素が全体のどの位置にいるか (0: 先頭, 1: 末尾)
           const ratio = totalItems > 1 ? idx / (totalItems - 1) : 0.5;
           
           if (isWindow) {
@@ -1234,7 +1239,6 @@ function useDragAndDrop(items, setItems) {
 function useAutoScrollDisable() {
   useEffect(() => {
     const checkScroll = () => {
-      // コンテンツの高さがウィンドウの高さ以下であればスクロールを無効化
       if (document.documentElement.scrollHeight <= window.innerHeight) {
         document.body.style.overflow = 'hidden';
       } else {
@@ -1242,13 +1246,9 @@ function useAutoScrollDisable() {
       }
     };
 
-    // 初期レンダリング時の判定
     checkScroll();
-
-    // 画面サイズ変更時の判定
     window.addEventListener('resize', checkScroll);
     
-    // 要素の追加や削除など、DOMの変更を監視して再判定
     const observer = new MutationObserver(checkScroll);
     observer.observe(document.body, { childList: true, subtree: true, attributes: true });
 
@@ -1267,18 +1267,18 @@ export default function App() {
   const [firebaseUser, setFirebaseUser] = useState(null);
   const [currentUser, setCurrentUser] = useState(null); 
   const [currentTab, setCurrentTab] = useState('timeline');
-  const [isRecordManual, setIsRecordManual] = useState(false); // 追加
-  const [importGymId, setImportGymId] = useState(''); // 追加
+  const [isRecordManual, setIsRecordManual] = useState(false);
+  const [importGymId, setImportGymId] = useState('');
 
   useEffect(() => {
-    const sessionStr = localStorage.getItem('duofit_login_session');
+    const sessionStr = localStorage.getItem('withfit_login_session');
     if (sessionStr) {
        try {
           const session = JSON.parse(sessionStr);
           if (session.userId && session.lastActive && Date.now() - session.lastActive <= 10 * 60 * 1000) {
              setCurrentUser(session.userId);
           } else {
-             localStorage.removeItem('duofit_login_session');
+             localStorage.removeItem('withfit_login_session');
           }
        } catch(e) {}
     }
@@ -1287,7 +1287,6 @@ export default function App() {
   const scrollPositions = useRef({});
   const prevTabRef = useRef('timeline');
 
-  // タブごとのスクロール位置を保持・復元する処理
   useEffect(() => {
     scrollPositions.current[prevTabRef.current] = window.scrollY;
     const targetPosition = scrollPositions.current[currentTab] || 0;
@@ -1325,9 +1324,9 @@ export default function App() {
              setDraftWorkoutItems(docSnap.data().currentWorkoutItems);
              setSelectedCategories(docSnap.data().currentSelectedCategories || []);
           } else {
-             const savedDraft = localStorage.getItem(`duofit_draft_${currentUser}`);
+             const savedDraft = localStorage.getItem(`withfit_draft_${currentUser}`);
              if (savedDraft) setDraftWorkoutItems(JSON.parse(savedDraft));
-             const savedCats = localStorage.getItem(`duofit_cats_${currentUser}`);
+             const savedCats = localStorage.getItem(`withfit_cats_${currentUser}`);
              if (savedCats) setSelectedCategories(JSON.parse(savedCats));
           }
         } catch (e) {
@@ -1346,10 +1345,10 @@ export default function App() {
     if (currentUser && db && isDraftLoaded) {
       try {
         if (draftWorkoutItems.length > 0) {
-          localStorage.setItem(`duofit_draft_${currentUser}`, JSON.stringify(draftWorkoutItems));
+          localStorage.setItem(`withfit_draft_${currentUser}`, JSON.stringify(draftWorkoutItems));
           setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), { currentWorkoutItems: draftWorkoutItems }, { merge: true }).catch(()=>{});
         } else {
-          localStorage.removeItem(`duofit_draft_${currentUser}`);
+          localStorage.removeItem(`withfit_draft_${currentUser}`);
           setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), { currentWorkoutItems: deleteField() }, { merge: true }).catch(()=>{});
         }
       } catch (e) {
@@ -1397,7 +1396,7 @@ export default function App() {
     }, () => setDataLoaded(prev => ({ ...prev, exercises: true })));
 
     const workoutsRef = collection(db, 'artifacts', appId, 'public', 'data', 'workouts');
-    const workoutsQuery = query(workoutsRef, orderBy('timestamp', 'desc'), limit(50));
+    const workoutsQuery = query(workoutsRef, orderBy('timestamp', 'desc'), limit(100));
     const u4 = onSnapshot(workoutsQuery, (snapshot) => {
       const workoutsData = []; snapshot.forEach(doc => { workoutsData.push({ id: doc.id, ...doc.data() }); }); setPosts(workoutsData); setDataLoaded(prev => ({ ...prev, workouts: true }));
     }, () => setDataLoaded(prev => ({ ...prev, workouts: true })));
@@ -1410,7 +1409,7 @@ export default function App() {
     const updatePresence = async (isVisible) => { 
       const now = Date.now();
       if (isVisible) {
-         localStorage.setItem('duofit_login_session', JSON.stringify({ userId: currentUser, lastActive: now }));
+         localStorage.setItem('withfit_login_session', JSON.stringify({ userId: currentUser, lastActive: now }));
       }
       if (!db || !isOnline) return;
       try { 
@@ -1438,27 +1437,20 @@ export default function App() {
     };
   }, [currentUser, isOnline]);
 
-  const handleLogin = async (userId, pin) => {
+  const handleLogin = async (username, pin) => {
     if (!db) return false;
-    const accountData = accountsInfo[userId];
+    const accountData = accountsInfo[username];
     if (!accountData || !accountData.pin) {
-      const defaultGender = userId === '勇太' ? 'male' : 'female';
-      const defaultBirthDate = userId === '勇太' ? '2002-08-26' : '';
-      try { await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', userId), { pin: pin, isTraining: false, lastActive: Date.now(), isAppOnline: true, theme: 'light', gender: defaultGender, birthDate: defaultBirthDate }, { merge: true }); setCurrentUser(userId); } catch (e) {}
+      try { 
+        await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', username), { pin: pin, isTraining: false, lastActive: Date.now(), isAppOnline: true, theme: 'light', friends: [] }, { merge: true }); 
+        setCurrentUser(username); 
+      } catch (e) { return false; }
     } else if (accountData.pin === pin) {
-      setCurrentUser(userId);
-      try { await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', userId), { lastActive: Date.now(), isAppOnline: true }, { merge: true }); } catch (e) {}
+      setCurrentUser(username);
+      try { await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', username), { lastActive: Date.now(), isAppOnline: true }, { merge: true }); } catch (e) {}
     } else { return false; }
     return true;
   };
-
-  const handleChangePin = async (userId, oldPin, newPin) => {
-    if (!db) return false;
-    if (accountsInfo[userId] && accountsInfo[userId].pin === oldPin) {
-       try { await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', userId), { pin: newPin }, { merge: true }); return true; } catch (e) {}
-    }
-    return false;
-  }
 
   const handleLogout = async () => { 
     if (currentUser && db) {
@@ -1466,7 +1458,7 @@ export default function App() {
         await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), { isAppOnline: false, lastActive: Date.now() }, { merge: true });
       } catch (e) {}
     }
-    localStorage.removeItem('duofit_login_session');
+    localStorage.removeItem('withfit_login_session');
     setCurrentUser(null); setCurrentTab('timeline'); setEditingPost(null); 
   };
 
@@ -1477,7 +1469,6 @@ export default function App() {
 
   const handlePostWorkout = async (gymName, workoutItems, bodyWeight, bodyFat, manualStart, manualEnd) => {
     if (!currentUser || !db) return;
-    // 種目が空でも、体重か体脂肪率の入力があれば保存できるように条件を変更
     if ((!workoutItems || workoutItems.length === 0) && !bodyWeight && !bodyFat) return;
 
     const myInfo = accountsInfo[currentUser];
@@ -1512,7 +1503,6 @@ export default function App() {
         }
     });
 
-    // 種目がない場合はカロリーとボリュームを0にする
     const { processedItems, totalVolume, totalCalories } = (!workoutItems || workoutItems.length === 0) 
         ? { processedItems: [], totalVolume: 0, totalCalories: 0 }
         : calculateWorkoutTotals(workoutItems, duration, bodyWeight || myInfo?.weight);
@@ -1520,7 +1510,6 @@ export default function App() {
     const totalSets = processedItems.reduce((acc, it) => acc + (it.sets?.length || 0), 0);
 
     const newDocId = `workout_${generateId()}`;
-    // Firebaseの保存エラーを防ぐため、undefinedプロパティを削除
     const cleanItems = JSON.parse(JSON.stringify(processedItems));
     try {
       await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'workouts', newDocId), {
@@ -1533,12 +1522,10 @@ export default function App() {
     } catch (e) { console.error("Post error:", e); }
   };
 
-
   const handleUpdateWorkout = async (postId, updatedData) => {
     if (!currentUser || !db) return;
     const { processedItems, totalVolume, totalCalories } = calculateWorkoutTotals(updatedData.items, updatedData.duration, updatedData.bodyWeight);
     const totalSets = processedItems.reduce((acc, it) => acc + (it.sets?.length || 0), 0);
-    // Firebaseの保存エラーを防ぐため、undefinedプロパティを削除
     const cleanItems = JSON.parse(JSON.stringify(processedItems));
     try { await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'workouts', postId), { ...updatedData, items: cleanItems, volume: totalVolume, calories: totalCalories, totalSets: totalSets }, { merge: true }); setEditingPost(null); } catch (e) { console.error("Update error:", e); }
   };
@@ -1596,7 +1583,7 @@ export default function App() {
     
     if (isManual) {
       setIsRecordManual(true);
-      setImportGymId(gymId); // 過去の記録画面にジムIDを引き継ぐ
+      setImportGymId(gymId);
     } else {
       setIsRecordManual(false);
       setImportGymId('');
@@ -1618,6 +1605,36 @@ export default function App() {
     }
   };
 
+  const handleAddFriend = async (friendUsername) => {
+    if (!currentUser || !db || !friendUsername) return;
+    if (friendUsername === currentUser) {
+      alert("自分自身は追加できません。");
+      return;
+    }
+    if (!accountsInfo[friendUsername]) {
+      alert("ユーザーが見つかりません。");
+      return;
+    }
+    const currentFriends = myInfo.friends || [];
+    if (currentFriends.includes(friendUsername)) {
+      alert("既にフレンドです。");
+      return;
+    }
+    try {
+      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), { friends: [...currentFriends, friendUsername] }, { merge: true });
+      alert(`${friendUsername}さんをフレンドに追加しました！`);
+    } catch (e) {}
+  };
+
+  const handleRemoveFriend = async (friendUsername) => {
+    if (!currentUser || !db) return;
+    if (!window.confirm(`${friendUsername}さんをフレンドから削除しますか？`)) return;
+    const currentFriends = myInfo.friends || [];
+    try {
+      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), { friends: currentFriends.filter(f => f !== friendUsername) }, { merge: true });
+    } catch (e) {}
+  };
+
   if (!isFullyLoaded) {
     return (
       <div className="h-screen overflow-hidden bg-slate-50 dark:bg-slate-950 flex flex-col items-center justify-center p-6">
@@ -1629,16 +1646,16 @@ export default function App() {
   }
 
   if (!currentUser) {
-    return <LoginScreen onLogin={handleLogin} accountsInfo={accountsInfo} onChangePin={handleChangePin} isOnline={isOnline} />;
+    return <LoginScreen onLogin={handleLogin} isOnline={isOnline} />;
   }
 
-  const partnerName = currentUser === '勇太' ? '未来' : '勇太';
-  const partnerInfo = accountsInfo[partnerName];
-  const partnerIsTraining = partnerInfo?.isTraining || false;
-  const isSameGym = Boolean(myInfo.isTraining && partnerIsTraining && myInfo.currentGymId && partnerInfo?.currentGymId && (myInfo.currentGymId === partnerInfo.currentGymId));
+  const myFriends = myInfo.friends || [];
+  const activeFriends = myFriends.filter(f => accountsInfo[f]?.isTraining);
   
   const isDarkMode = ['dark', 'ocean', 'mono'].includes(myInfo.theme);
   const themeContainerClass = myInfo.theme === 'ocean' ? 'theme-ocean' : myInfo.theme === 'pop' ? 'theme-pop' : '';
+  
+  const visiblePosts = posts.filter(p => p.author === currentUser || myFriends.includes(p.author));
 
   return (
     <div className={`min-h-screen font-sans pb-32 overflow-x-hidden select-none transition-colors duration-300 ${isDarkMode ? 'dark bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-800'} ${themeContainerClass}`}>
@@ -1698,14 +1715,9 @@ export default function App() {
         `}</style>
       )}
       <header className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 sticky top-0 z-20 shadow-sm flex flex-col transition-colors">
-        {isSameGym && (
-          <div className="bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-500 px-4 py-2 flex items-center justify-center gap-2 text-white text-xs font-bold animate-pulse shadow-inner">
-            <span>🔥 パートナーと同じジムでトレーニング中！ 🔥</span>
-          </div>
-        )}
         <div className="p-4 flex justify-between items-center">
           <h1 className="text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
-            <Activity className="text-emerald-500" /> Duo<span className="text-emerald-500">Fit</span>
+            <Activity className="text-emerald-500" /> With<span className="text-emerald-500">Fit</span>
           </h1>
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-1.5 bg-slate-50 dark:bg-slate-950 px-2 py-1.5 rounded-full border border-slate-200 dark:border-slate-800">
@@ -1714,27 +1726,26 @@ export default function App() {
             </div>
             <button onClick={() => setShowProfileModal(true)} className="flex items-center gap-2 bg-slate-100 dark:bg-slate-800 px-3 py-1.5 rounded-full border border-slate-200 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
               <div className="w-6 h-6 rounded-full bg-emerald-100 dark:bg-emerald-950 flex items-center justify-center text-emerald-700 dark:text-emerald-400 font-bold text-xs overflow-hidden border border-emerald-200 dark:border-emerald-800">
-                {myInfo.photoUrl ? <img src={myInfo.photoUrl} alt="profile" className="w-full h-full object-cover" /> : currentUser.charAt(0)}
+                {myInfo.photoUrl ? <img src={myInfo.photoUrl} alt="profile" className="w-full h-full object-cover" /> : currentUser.charAt(0).toUpperCase()}
               </div>
               <span className="text-sm font-bold text-slate-700 dark:text-slate-200 hidden sm:inline">{currentUser}</span>
             </button>
             <button onClick={handleLogout} className="text-slate-400 hover:text-rose-500 dark:hover:text-rose-400 p-1.5 rounded-full transition-colors"><LogOut size={20} /></button>
           </div>
         </div>
-        {partnerIsTraining && !isSameGym && (
+        {activeFriends.length > 0 && (
           <div className="bg-gradient-to-r from-emerald-500 to-teal-500 text-white px-4 py-2 flex flex-col items-center justify-center text-xs font-bold animate-in slide-in-from-top duration-300">
-            <div className="flex items-center gap-2 mb-0.5"><Flame size={14} className="animate-pulse text-amber-300" /> {partnerName}さんがトレーニング中です！ <TimerDisplay startTime={partnerInfo.trainingStartTime} /></div>
-            <div className="text-[10px] text-emerald-100">{partnerInfo.currentGymId ? allGyms.find(g => g.id === partnerInfo.currentGymId)?.name : 'ジム'} - {partnerInfo.currentExerciseName || '準備中'}</div>
+            <div className="flex items-center gap-2 mb-0.5"><Flame size={14} className="animate-pulse text-amber-300" /> {activeFriends.join(', ')}さんがトレーニング中です！</div>
           </div>
         )}
       </header>
 
       <main className="p-4 max-w-md mx-auto w-full pb-40">
-        {currentTab === 'timeline' && <TimelineView posts={posts} onToggleLike={toggleLike} onImport={handleImportWorkout} currentUser={currentUser} onDelete={handleDeleteWorkout} onEdit={setEditingPost} accountsInfo={accountsInfo} />}
-        {currentTab === 'exercises' && <ExercisesView gyms={allGyms} exercises={exercises} posts={posts} accountsInfo={accountsInfo} />}
-        {currentTab === 'record' && <RecordView onStart={handleStartTraining} onPost={handlePostWorkout} onCancel={handleCancelTraining} myInfo={myInfo} gyms={allGyms} exercises={exercises} workoutItems={draftWorkoutItems} setWorkoutItems={setDraftWorkoutItems} selectedCategories={selectedCategories} setSelectedCategories={setSelectedCategories} posts={posts} currentUser={currentUser} isManual={isRecordManual} setIsManual={setIsRecordManual} onActiveExerciseChange={handleActiveExerciseChange} />}
-        {currentTab === 'data' && <DataView posts={posts} currentUser={currentUser} partnerName={partnerName} accountsInfo={accountsInfo} onEdit={setEditingPost} onDelete={handleDeleteWorkout} onImport={handleImportWorkout} />}
-        {currentTab === 'friends' && <FriendsView partnerName={partnerName} partnerInfo={partnerInfo} currentUser={currentUser} posts={posts} accountsInfo={accountsInfo} />}
+        {currentTab === 'timeline' && <TimelineView posts={visiblePosts} onToggleLike={toggleLike} onImport={handleImportWorkout} currentUser={currentUser} onDelete={handleDeleteWorkout} onEdit={setEditingPost} accountsInfo={accountsInfo} />}
+        {currentTab === 'exercises' && <ExercisesView gyms={allGyms} exercises={exercises} posts={visiblePosts} accountsInfo={accountsInfo} />}
+        {currentTab === 'record' && <RecordView onStart={handleStartTraining} onPost={handlePostWorkout} onCancel={handleCancelTraining} myInfo={myInfo} gyms={allGyms} exercises={exercises} workoutItems={draftWorkoutItems} setWorkoutItems={setDraftWorkoutItems} selectedCategories={selectedCategories} setSelectedCategories={setSelectedCategories} posts={visiblePosts} currentUser={currentUser} isManual={isRecordManual} setIsManual={setIsRecordManual} onActiveExerciseChange={handleActiveExerciseChange} />}
+        {currentTab === 'data' && <DataView posts={visiblePosts} currentUser={currentUser} myFriends={myFriends} accountsInfo={accountsInfo} onEdit={setEditingPost} onDelete={handleDeleteWorkout} onImport={handleImportWorkout} />}
+        {currentTab === 'friends' && <FriendsView currentUser={currentUser} myInfo={myInfo} posts={visiblePosts} accountsInfo={accountsInfo} onAddFriend={handleAddFriend} onRemoveFriend={handleRemoveFriend} />}
       </main>
 
       {editingPost && <EditWorkoutModal post={editingPost} gyms={allGyms} exercises={exercises} onClose={() => setEditingPost(null)} onSave={handleUpdateWorkout} myPastPosts={posts.filter(p => p.author === currentUser)} />}
@@ -1745,7 +1756,7 @@ export default function App() {
           <NavButton icon={<Dumbbell size={22} />} label="種目" isActive={currentTab === 'exercises'} onClick={() => setCurrentTab('exercises')} />
           <NavButton icon={myInfo.isTraining ? <Clock className="animate-pulse" size={28}/> : <PlusCircle size={28} />} label={myInfo.isTraining ? "記録中" : "記録"} isActive={currentTab === 'record'} onClick={() => setCurrentTab('record')} isPrimary isTraining={myInfo.isTraining} />
           <NavButton icon={<CalendarIcon size={22} />} label="データ" isActive={currentTab === 'data'} onClick={() => setCurrentTab('data')} />
-          <NavButton icon={<Users size={22} />} label="パートナー" isActive={currentTab === 'friends'} onClick={() => setCurrentTab('friends')} />
+          <NavButton icon={<Users size={22} />} label="フレンド" isActive={currentTab === 'friends'} onClick={() => setCurrentTab('friends')} />
         </div>
       </nav>
 
@@ -1761,8 +1772,8 @@ function ProfileModal({ isOpen, onClose, userInfo, onSave, currentUser }) {
   const [theme, setTheme] = useState(userInfo?.theme || 'light');
   const [photoUrl, setPhotoUrl] = useState(userInfo?.photoUrl || null);
   
-  const [birthDate, setBirthDate] = useState(userInfo?.birthDate || (currentUser === '勇太' ? '2002-08-26' : ''));
-  const [gender, setGender] = useState(userInfo?.gender || (currentUser === '勇太' ? 'male' : 'female'));
+  const [birthDate, setBirthDate] = useState(userInfo?.birthDate || '');
+  const [gender, setGender] = useState(userInfo?.gender || 'male');
   const [height, setHeight] = useState(userInfo?.height || '');
   const [weight, setWeight] = useState(userInfo?.weight || '');
 
@@ -1771,8 +1782,8 @@ function ProfileModal({ isOpen, onClose, userInfo, onSave, currentUser }) {
       setGoal(userInfo?.goal || '');
       setTheme(userInfo?.theme || 'light');
       setPhotoUrl(userInfo?.photoUrl || null);
-      setBirthDate(userInfo?.birthDate || (currentUser === '勇太' ? '2002-08-26' : ''));
-      setGender(userInfo?.gender || (currentUser === '勇太' ? 'male' : 'female'));
+      setBirthDate(userInfo?.birthDate || '');
+      setGender(userInfo?.gender || 'male');
       setHeight(userInfo?.height || '');
       setWeight(userInfo?.weight || '');
     }
@@ -1840,6 +1851,7 @@ function ProfileModal({ isOpen, onClose, userInfo, onSave, currentUser }) {
                 <select value={gender} onChange={e => setGender(e.target.value)} className="w-full min-w-0 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl px-2 py-2 text-sm text-slate-800 dark:text-slate-100 font-bold focus:outline-none focus:border-emerald-500" style={{ fontSize: '16px' }}>
                    <option value="male">男性</option>
                    <option value="female">女性</option>
+                   <option value="other">その他</option>
                 </select>
              </div>
              <div className="min-w-0 overflow-hidden">
@@ -1883,104 +1895,29 @@ function ProfileModal({ isOpen, onClose, userInfo, onSave, currentUser }) {
   );
 }
 
-// --- ログイン画面 ---
-function LoginScreen({ onLogin, accountsInfo, onChangePin, isOnline }) {
-  const [selectedUser, setSelectedUser] = useState(null);
+// --- ログイン・登録画面 ---
+function LoginScreen({ onLogin, isOnline }) {
+  const [username, setUsername] = useState('');
   const [pin, setPin] = useState('');
   const [error, setError] = useState('');
-  
-  const [isChangingPin, setIsChangingPin] = useState(false);
-  const [step, setStep] = useState(1);
-  const [currentPin, setCurrentPin] = useState('');
-  const [newPin, setNewPin] = useState('');
-
-  const isRegistered = (userId) => accountsInfo && accountsInfo[userId] && accountsInfo[userId].pin;
+  const [isRegistering, setIsRegistering] = useState(false);
   
   const handlePinInput = (num) => { 
     if (pin.length < 4) { setPin(prev => prev + num); setError(''); } 
   };
   const handleBackspace = () => { setPin(prev => prev.slice(0, -1)); setError(''); };
   
-  const handleSubmitLogin = async () => {
-    if (pin.length !== 4) return;
-    const success = await onLogin(selectedUser, pin);
-    if (!success) { setError('パスワードが間違っています'); setPin(''); }
-  };
-
-  const handleSubmitChangePin = async () => {
-     if (pin.length !== 4) return;
-     if (step === 2) {
-       if (accountsInfo[selectedUser]?.pin === pin) {
-         setCurrentPin(pin); setPin(''); setError(''); setStep(3); 
-       } else {
-         setError('現在のパスワードが間違っています'); setPin('');
-       }
-     } else if (step === 3) {
-       setNewPin(pin); setPin(''); setError(''); setStep(4);
-     } else if (step === 4) {
-       if (newPin === pin) {
-         const success = await onChangePin(selectedUser, currentPin, newPin);
-         if (success) { alert("パスワードを変更しました"); resetChangePinState(); } else { setError('パスワードの変更に失敗しました'); setPin(''); }
-       } else {
-          setError('新しいパスワードが一致しません'); setPin('');
-       }
-     }
+  const handleSubmit = async () => {
+    if (pin.length !== 4 || !username.trim()) return;
+    const success = await onLogin(username.trim(), pin);
+    if (!success) { setError('パスワードが間違っています。新規登録の場合は異なるユーザー名をお試しください。'); setPin(''); }
   };
 
   useEffect(() => { 
     if (pin.length === 4) {
-      if (isChangingPin) { handleSubmitChangePin(); } else { handleSubmitLogin(); }
+      handleSubmit();
     }
-  }, [pin, isChangingPin]);
-
-  const resetChangePinState = () => { setIsChangingPin(false); setSelectedUser(null); setPin(''); setError(''); setStep(1); setCurrentPin(''); setNewPin(''); }
-
-  if (!selectedUser) {
-    return (
-      <div className="h-screen overflow-hidden bg-slate-50 flex flex-col items-center justify-center p-6 relative">
-        <div className="absolute top-6 left-6 z-10 flex items-center gap-1.5 bg-white/80 backdrop-blur px-3 py-1.5 rounded-full border border-slate-200 shadow-sm">
-          <div className={`w-2 h-2 rounded-full ${isOnline ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.5)]'}`}></div>
-          <span className="text-[10px] font-bold text-slate-500">{isOnline ? 'オンライン' : 'オフライン (キャッシュ利用)'}</span>
-        </div>
-        <button onClick={() => setIsChangingPin(true)} className={`absolute top-6 right-6 text-sm font-bold flex items-center gap-1.5 px-3 py-1.5 rounded-full transition-colors ${isChangingPin ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-600 hover:bg-slate-300'}`}>
-          <KeyRound size={16} />{isChangingPin ? 'パスワード変更モード' : 'パスワード変更'}
-        </button>
-        {isChangingPin && (
-          <div className="absolute top-16 right-6 text-xs text-emerald-600 font-bold bg-emerald-50 px-3 py-2 rounded-lg border border-emerald-200 shadow-sm">
-            変更するユーザーを選択してください
-          </div>
-        )}
-
-        <div className="w-full max-w-sm space-y-8 bg-white p-8 rounded-3xl border border-slate-200 shadow-xl">
-          <div className="text-center">
-            <Activity className="text-emerald-500 w-16 h-16 mx-auto mb-4" />
-            <h1 className="text-3xl font-bold text-slate-900 tracking-tight mb-2">ログイン</h1>
-          </div>
-          <div className="grid grid-cols-2 gap-4 mt-8">
-            <button onClick={() => {setSelectedUser('勇太'); setStep(2);}} className="flex flex-col items-center justify-center bg-slate-50 hover:bg-slate-100 p-6 rounded-2xl transition-all border border-slate-200 hover:border-emerald-300">
-              <div className="w-16 h-16 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-bold text-2xl mb-3 overflow-hidden border border-indigo-200">
-                {accountsInfo && accountsInfo['勇太']?.photoUrl ? <img src={accountsInfo['勇太'].photoUrl} alt="勇太" className="w-full h-full object-cover" /> : '勇'}
-              </div>
-              <span className="text-slate-800 font-bold">勇太</span>
-            </button>
-            <button onClick={() => {setSelectedUser('未来'); setStep(2);}} className="flex flex-col items-center justify-center bg-slate-50 hover:bg-slate-100 p-6 rounded-2xl transition-all border border-slate-200 hover:border-emerald-300">
-              <div className="w-16 h-16 rounded-full bg-rose-100 flex items-center justify-center text-rose-600 font-bold text-2xl mb-3 overflow-hidden border border-rose-200">
-                {accountsInfo && accountsInfo['未来']?.photoUrl ? <img src={accountsInfo['未来'].photoUrl} alt="未来" className="w-full h-full object-cover" /> : '未'}
-              </div>
-              <span className="text-slate-800 font-bold">未来</span>
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  let pinPrompt = isRegistered(selectedUser) ? 'PINコードを入力' : '初回のPINコード(4桁)を設定';
-  if (isChangingPin) {
-    if (step === 2) pinPrompt = '現在のPINコードを入力';
-    else if (step === 3) pinPrompt = '新しいPINコード(4桁)を入力';
-    else if (step === 4) pinPrompt = 'もう一度新しいPINコードを入力';
-  }
+  }, [pin]);
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-6 relative">
@@ -1988,24 +1925,35 @@ function LoginScreen({ onLogin, accountsInfo, onChangePin, isOnline }) {
         <div className={`w-2 h-2 rounded-full ${isOnline ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.5)]'}`}></div>
         <span className="text-[10px] font-bold text-slate-500">{isOnline ? 'オンライン' : 'オフライン (キャッシュ利用)'}</span>
       </div>
+      
       <div className="w-full max-w-sm flex flex-col items-center">
-        <button onClick={() => isChangingPin ? resetChangePinState() : setSelectedUser(null)} className="text-slate-500 hover:text-slate-800 self-start mb-8 flex items-center gap-2 font-bold">
-          &larr; 戻る
-        </button>
-        <div className="w-20 h-20 rounded-full bg-slate-100 border-2 border-slate-200 flex items-center justify-center text-slate-800 font-bold text-3xl mb-4 shadow-sm overflow-hidden">
-          {accountsInfo && accountsInfo[selectedUser]?.photoUrl ? <img src={accountsInfo[selectedUser].photoUrl} alt={selectedUser} className="w-full h-full object-cover" /> : selectedUser.charAt(0)}
+        <div className="mb-6 flex flex-col items-center">
+          <Activity className="text-emerald-500 w-16 h-16 mb-2" />
+          <h1 className="text-3xl font-bold text-slate-900 tracking-tight">WithFit</h1>
+          <p className="text-sm text-slate-500 font-bold mt-1">みんなで鍛える、記録アプリ</p>
         </div>
-        <h2 className="text-2xl font-bold text-slate-900 mb-2">{selectedUser} {isChangingPin && <span className="text-sm text-emerald-600 ml-2">(パスワード変更)</span>}</h2>
-        <p className="text-slate-500 text-sm mb-8 flex items-center gap-2 font-bold"><Lock size={14} />{pinPrompt}</p>
-        <div className="flex gap-4 mb-8">
-          {[0, 1, 2, 3].map(i => <div key={i} className={`w-4 h-4 rounded-full transition-colors duration-200 ${i < pin.length ? 'bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.3)]' : 'bg-slate-200'}`} />)}
-        </div>
-        {error && <p className="text-rose-500 text-sm mb-4 font-bold">{error}</p>}
-        <div className="grid grid-cols-3 gap-4 w-full max-w-[280px]">
-          {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(num => <button key={num} onClick={() => handlePinInput(num.toString())} className="h-16 rounded-full bg-white border border-slate-200 text-slate-800 text-2xl font-bold hover:bg-slate-50 active:bg-slate-100 transition-colors shadow-sm">{num}</button>)}
-          <div />
-          <button onClick={() => handlePinInput('0')} className="h-16 rounded-full bg-white border border-slate-200 text-slate-800 text-2xl font-bold hover:bg-slate-50 active:bg-slate-100 transition-colors shadow-sm">0</button>
-          <button onClick={handleBackspace} className="h-16 rounded-full flex items-center justify-center text-slate-500 hover:text-slate-800 active:bg-slate-100 transition-colors">⌫</button>
+
+        <div className="w-full bg-white p-6 rounded-3xl border border-slate-200 shadow-xl flex flex-col items-center">
+           <div className="w-full mb-6">
+              <label className="block text-sm font-bold text-slate-700 mb-2">ユーザー名</label>
+              <input type="text" value={username} onChange={e => setUsername(e.target.value)} placeholder="例: yuta123" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-800 font-bold focus:outline-none focus:border-emerald-500" />
+           </div>
+
+           <p className="text-slate-500 text-sm mb-4 flex items-center gap-2 font-bold"><Lock size={14} />PINコード (4桁)</p>
+           <div className="flex gap-4 mb-6">
+             {[0, 1, 2, 3].map(i => <div key={i} className={`w-4 h-4 rounded-full transition-colors duration-200 ${i < pin.length ? 'bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.3)]' : 'bg-slate-200'}`} />)}
+           </div>
+           
+           {error && <p className="text-rose-500 text-xs mb-4 font-bold text-center">{error}</p>}
+           
+           <div className="grid grid-cols-3 gap-4 w-full max-w-[280px]">
+             {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(num => <button key={num} onClick={() => handlePinInput(num.toString())} disabled={!username.trim()} className="h-16 rounded-full bg-white border border-slate-200 text-slate-800 text-2xl font-bold hover:bg-slate-50 active:bg-slate-100 transition-colors shadow-sm disabled:opacity-50">{num}</button>)}
+             <div />
+             <button onClick={() => handlePinInput('0')} disabled={!username.trim()} className="h-16 rounded-full bg-white border border-slate-200 text-slate-800 text-2xl font-bold hover:bg-slate-50 active:bg-slate-100 transition-colors shadow-sm disabled:opacity-50">0</button>
+             <button onClick={handleBackspace} className="h-16 rounded-full flex items-center justify-center text-slate-500 hover:text-slate-800 active:bg-slate-100 transition-colors">⌫</button>
+           </div>
+           
+           <p className="text-xs text-slate-400 mt-6 font-bold text-center">※ユーザー名が存在しない場合は自動で新規登録されます。</p>
         </div>
       </div>
     </div>
@@ -2075,8 +2023,8 @@ function MonthlyReport({ monthDate, posts, userName, accountsInfo }) {
   return (
     <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm animate-in fade-in">
       <div className="flex items-center gap-3 mb-5">
-         <div className={`w-8 h-8 rounded-full overflow-hidden flex items-center justify-center font-bold text-white text-xs ${userName === '勇太' ? 'bg-indigo-500' : 'bg-rose-500'}`}>
-            {accountsInfo[userName]?.photoUrl ? <img src={accountsInfo[userName].photoUrl} alt={userName} className="w-full h-full object-cover" /> : userName.charAt(0)}
+         <div className="w-8 h-8 rounded-full overflow-hidden flex items-center justify-center font-bold text-white text-xs bg-slate-600">
+            {accountsInfo[userName]?.photoUrl ? <img src={accountsInfo[userName].photoUrl} alt={userName} className="w-full h-full object-cover" /> : userName.charAt(0).toUpperCase()}
          </div>
          <h3 className="font-bold text-slate-800 dark:text-slate-100">{userName} のレポート</h3>
       </div>
@@ -2193,14 +2141,12 @@ function BodyCompositionInfo({ info, dailyCalories = 0, dateLabel = '' }) {
      </div>
   );
 }
-/// --- データ画面 (カレンダー・グラフ・レポート) ---
-function DataView({ posts, currentUser, partnerName, accountsInfo, onEdit, onDelete, onImport }) {
-  const myPosts = posts ? posts.filter(p => p.author === currentUser) : [];
-  const partnerPosts = posts ? posts.filter(p => p.author === partnerName) : [];
-  
+
+// --- データ画面 (カレンダー・グラフ・レポート) ---
+function DataView({ posts, currentUser, myFriends, accountsInfo, onEdit, onDelete, onImport }) {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDateStr, setSelectedDateStr] = useState(formatDateFromTimestamp(Date.now()));
-  const [postsTab, setPostsTab] = useState(currentUser); // 記録の切り替えタブ
+  const [postsTab, setPostsTab] = useState(currentUser);
   
   const year = currentMonth.getFullYear();
   const month = currentMonth.getMonth();
@@ -2208,12 +2154,15 @@ function DataView({ posts, currentUser, partnerName, accountsInfo, onEdit, onDel
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const todayStr = formatDateFromTimestamp(Date.now());
   
+  const myPosts = posts.filter(p => p.author === currentUser);
+  const friendPosts = posts.filter(p => myFriends.includes(p.author));
+
   const blanks = Array.from({ length: firstDay || 0 }).map((_, i) => <div key={`blank-${i}`} className="p-2"></div>);
   const days = Array.from({ length: daysInMonth || 0 }).map((_, i) => {
     const date = i + 1;
     const dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(date).padStart(2,'0')}`;
     const isMyTraining = myPosts.some(p => formatDateFromTimestamp(p.timestamp) === dateStr);
-    const isPartnerTraining = partnerPosts.some(p => formatDateFromTimestamp(p.timestamp) === dateStr);
+    const isFriendTraining = friendPosts.some(p => formatDateFromTimestamp(p.timestamp) === dateStr);
     const isSelected = selectedDateStr === dateStr;
     const isToday = dateStr === todayStr;
     
@@ -2221,14 +2170,14 @@ function DataView({ posts, currentUser, partnerName, accountsInfo, onEdit, onDel
       <div key={`day-${date}`} className="p-1 flex flex-col justify-center items-center h-14" onClick={() => setSelectedDateStr(dateStr)}>
         <div className={`w-8 h-8 flex items-center justify-center rounded-full text-sm font-bold transition-all cursor-pointer 
           ${isSelected ? 'ring-2 ring-offset-1 ring-emerald-500 dark:ring-offset-slate-900' : ''} 
-          ${isMyTraining || isPartnerTraining ? 'bg-slate-100 dark:bg-slate-800' : 'hover:bg-slate-50 dark:hover:bg-slate-800'}
+          ${isMyTraining || isFriendTraining ? 'bg-slate-100 dark:bg-slate-800' : 'hover:bg-slate-50 dark:hover:bg-slate-800'}
           ${isToday ? 'border-2 border-emerald-400 text-emerald-600 dark:text-emerald-400' : 'text-slate-700 dark:text-slate-300'}
         `}>
           {date}
         </div>
         <div className="flex gap-1 mt-1 h-1.5">
-          {isMyTraining && <div className={`w-1.5 h-1.5 rounded-full ${currentUser === '勇太' ? 'bg-indigo-500' : 'bg-rose-500'}`}></div>}
-          {isPartnerTraining && <div className={`w-1.5 h-1.5 rounded-full ${partnerName === '勇太' ? 'bg-indigo-500' : 'bg-rose-500'}`}></div>}
+          {isMyTraining && <div className="w-1.5 h-1.5 rounded-full bg-emerald-500"></div>}
+          {isFriendTraining && <div className="w-1.5 h-1.5 rounded-full bg-blue-500"></div>}
         </div>
       </div>
     );
@@ -2237,10 +2186,8 @@ function DataView({ posts, currentUser, partnerName, accountsInfo, onEdit, onDel
   const weightData = myPosts.filter(p => p.bodyWeight && !isNaN(p.bodyWeight)).map(p => ({ date: p.date, value: Number(p.bodyWeight) })).reverse();
   const fatData = myPosts.filter(p => p.bodyFat && !isNaN(p.bodyFat)).map(p => ({ date: p.date, value: Number(p.bodyFat) })).reverse();
 
-  // 選択した日付・タブ（自分/相手）のトレーニング記録
   const selectedPosts = posts.filter(p => p.author === postsTab && formatDateFromTimestamp(p.timestamp) === selectedDateStr);
 
-  // 一番上の体組成データおよび消費カロリーは、下のタブに関わらず常に自分（currentUser）のデータに固定
   const myUserInfo = accountsInfo[currentUser] || {};
   const lastMyFatPost = myPosts.find(p => p.bodyFat);
   const myCompositionInfo = { ...myUserInfo, lastFat: lastMyFatPost ? lastMyFatPost.bodyFat : null };
@@ -2271,8 +2218,8 @@ function DataView({ posts, currentUser, partnerName, accountsInfo, onEdit, onDel
         <div className="grid grid-cols-7 text-center">{blanks}{days}</div>
         
         <div className="flex justify-center gap-4 mt-4 pt-4 border-t border-slate-100 dark:border-slate-800">
-           <div className="flex items-center gap-1.5 text-xs font-bold text-slate-500 dark:text-slate-400"><div className={`w-2 h-2 rounded-full ${currentUser === '勇太' ? 'bg-indigo-500' : 'bg-rose-500'}`}></div> {currentUser}</div>
-           <div className="flex items-center gap-1.5 text-xs font-bold text-slate-500 dark:text-slate-400"><div className={`w-2 h-2 rounded-full ${partnerName === '勇太' ? 'bg-indigo-500' : 'bg-rose-500'}`}></div> {partnerName}</div>
+           <div className="flex items-center gap-1.5 text-xs font-bold text-slate-500 dark:text-slate-400"><div className="w-2 h-2 rounded-full bg-emerald-500"></div> 自分</div>
+           <div className="flex items-center gap-1.5 text-xs font-bold text-slate-500 dark:text-slate-400"><div className="w-2 h-2 rounded-full bg-blue-500"></div> フレンド</div>
         </div>
       </div>
       
@@ -2280,9 +2227,11 @@ function DataView({ posts, currentUser, partnerName, accountsInfo, onEdit, onDel
         <div className="pt-2 animate-in fade-in">
           <h3 className="text-sm font-bold text-slate-500 dark:text-slate-400 mb-3">{selectedDateStr.replace(/-/g, '/')} の記録</h3>
           
-          <div className="flex bg-slate-200 dark:bg-slate-800 p-1 rounded-xl mb-4">
-            <button onClick={() => setPostsTab(currentUser)} className={`flex-1 py-2 text-sm font-bold text-center rounded-lg transition-colors ${postsTab === currentUser ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'}`}>{currentUser}</button>
-            <button onClick={() => setPostsTab(partnerName)} className={`flex-1 py-2 text-sm font-bold text-center rounded-lg transition-colors ${postsTab === partnerName ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'}`}>{partnerName}</button>
+          <div className="flex bg-slate-200 dark:bg-slate-800 p-1 rounded-xl mb-4 overflow-x-auto">
+            <button onClick={() => setPostsTab(currentUser)} className={`flex-shrink-0 px-4 py-2 text-sm font-bold text-center rounded-lg transition-colors ${postsTab === currentUser ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'}`}>自分</button>
+            {myFriends.map(friend => (
+              <button key={friend} onClick={() => setPostsTab(friend)} className={`flex-shrink-0 px-4 py-2 text-sm font-bold text-center rounded-lg transition-colors ${postsTab === friend ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'}`}>{friend}</button>
+            ))}
           </div>
 
           {selectedPosts.length > 0 ? (
@@ -2339,12 +2288,10 @@ function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workou
   const [bodyWeight, setBodyWeight] = useState('');
   const [bodyFat, setBodyFat] = useState('');
 
-  // 過去の記録用ステート
   const [manualDate, setManualDate] = useState(formatDateFromTimestamp(Date.now()));
   const [manualStartTime, setManualStartTime] = useState("12:00");
   const [manualEndTime, setManualEndTime] = useState("13:00");
 
-  // 体重・体脂肪率のみ記録モードのステート
   const [isMetricsOnlyMode, setIsMetricsOnlyMode] = useState(false);
 
   const isTraining = myInfo.isTraining;
@@ -2959,10 +2906,8 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo }) {
     e.preventDefault();
     if (!editExName.trim()) return;
     try { 
-      // 種目マスターデータの更新
       await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'exercises', editingExId), { name: editExName.trim(), maker: editExMaker.trim(), weightType: editExWeightType, category: editExCategory, gymId: editingExGymId, freeWeightType: editingExGymId === 'common' ? editExFreeWeightType : null }, { merge: true }); 
 
-      // 過去の投稿を一括更新（種目名・カテゴリ・重量タイプの変更を反映）
       if (posts && posts.length > 0) {
         const postsToUpdate = posts.filter(post => {
           if (!post.items) return false;
@@ -2993,7 +2938,6 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo }) {
               return newItem;
             });
 
-            // 変更後の重量タイプに基づいてボリューム・カロリー・セット数を再計算
             const baseWeight = Number(post.bodyWeight) || Number(accountsInfo[post.author]?.weight) || 60;
             const { processedItems, totalVolume, totalCalories } = calculateWorkoutTotals(updatedItems, post.duration, baseWeight);
             const totalSets = processedItems.reduce((acc, it) => acc + (it.sets?.length || 0), 0);
@@ -3260,22 +3204,17 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo }) {
     </div>
   );
 }
-// --- パートナー画面 ---
-function FriendsView({ partnerName, partnerInfo, currentUser, posts, accountsInfo }) {
+
+// --- フレンド画面 ---
+function FriendsView({ currentUser, myInfo, posts, accountsInfo, onAddFriend, onRemoveFriend }) {
   const [currentTime, setCurrentTime] = useState(Date.now());
+  const [searchUsername, setSearchUsername] = useState('');
+  const [activeTab, setActiveTab] = useState('friends');
 
   useEffect(() => {
-    // 5秒ごとに現在時刻を更新し、相手の最終アクセス時刻との差分をリアルタイムで再評価する
     const timerId = setInterval(() => setCurrentTime(Date.now()), 5000);
     return () => clearInterval(timerId);
   }, []);
-
-  const isTraining = partnerInfo?.isTraining;
-  const lastActive = partnerInfo?.lastActive || 0;
-  
-  // フラグがtrue、かつ45秒以内に通信がある場合のみオンラインとする
-  const isAppOnline = partnerInfo?.isAppOnline !== false;
-  const isOnline = isAppOnline && lastActive > 0 && (currentTime - lastActive < 45000);
 
   const getTimeAgo = (timestamp) => {
     if (!timestamp || timestamp === 0) return '不明';
@@ -3290,144 +3229,91 @@ function FriendsView({ partnerName, partnerInfo, currentUser, posts, accountsInf
     return `${days}日前`;
   };
 
-  let cardGradient = 'bg-gradient-to-br from-slate-400 to-slate-500 shadow-slate-500/20'; 
-  let iconBorder = 'border-slate-300';
-  let badgeColor = 'bg-slate-400';
-  
-  if (isTraining) { cardGradient = 'bg-gradient-to-br from-amber-500 to-orange-600 shadow-orange-500/20'; iconBorder = 'border-orange-400'; badgeColor = isOnline ? 'bg-amber-400' : 'bg-slate-400'; } 
-  else if (isOnline) { cardGradient = 'bg-gradient-to-br from-emerald-500 to-teal-600 shadow-emerald-500/20'; iconBorder = 'border-emerald-400'; badgeColor = 'bg-emerald-400'; }
+  const handleSearchSubmit = (e) => {
+    e.preventDefault();
+    onAddFriend(searchUsername.trim());
+    setSearchUsername('');
+  };
 
-  const partnerPosts = posts ? posts.filter(p => p.author === partnerName) : [];
-  const weightData = partnerPosts.filter(p => p.bodyWeight && !isNaN(p.bodyWeight)).map(p => ({ date: p.date, value: Number(p.bodyWeight) })).reverse();
-  const fatData = partnerPosts.filter(p => p.bodyFat && !isNaN(p.bodyFat)).map(p => ({ date: p.date, value: Number(p.bodyFat) })).reverse();
-
-  const currentMonth = new Date().getMonth();
-  const currentYear = new Date().getFullYear();
-  const currentMonthPosts = posts.filter(p => {
-    const d = new Date(p.timestamp);
-    return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
-  });
-
-  const myMonthVolume = currentMonthPosts.filter(p => p.author === currentUser).reduce((sum, p) => sum + (Number(p.volume) || 0), 0);
-  const partnerMonthVolume = currentMonthPosts.filter(p => p.author === partnerName).reduce((sum, p) => sum + (Number(p.volume) || 0), 0);
-  const totalMonthVolume = myMonthVolume + partnerMonthVolume;
-  const targetVolume = 500000; 
-  const progressPercent = Math.min(100, (totalMonthVolume / targetVolume) * 100);
-  
-  const myPercent = Math.min(100, (myMonthVolume / targetVolume) * 100);
-  const partnerPercent = Math.min(100 - myPercent, (partnerMonthVolume / targetVolume) * 100);
-
-  const lastPartnerFat = partnerPosts.find(p => p.bodyFat);
-  const partnerCompositionInfo = { ...partnerInfo, lastFat: lastPartnerFat ? lastPartnerFat.bodyFat : null };
-
-  const todayStr = formatDateFromTimestamp(Date.now());
-  const todayPartnerPosts = partnerPosts.filter(p => formatDateFromTimestamp(p.timestamp) === todayStr);
-  const partnerDailyCalories = todayPartnerPosts.reduce((sum, p) => sum + (Number(p.calories) || 0), 0);
-  const dateLabel = todayStr.substring(5).replace('-', '/');
+  const myFriends = myInfo.friends || [];
 
   return (
-    <div className="space-y-6">
-      <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-6">パートナー</h2>
-      <div className={`rounded-3xl p-6 relative overflow-hidden shadow-lg w-full text-white transition-colors duration-500 ${cardGradient}`}>
-        <div className="absolute top-0 right-0 w-40 h-40 bg-white/10 rounded-full blur-2xl -mr-10 -mt-10"></div>
-        <div className="absolute bottom-0 left-0 w-32 h-32 bg-black/10 rounded-full blur-2xl -ml-10 -mb-10"></div>
-        
-        <div className="flex flex-col items-center justify-center text-center relative z-10 py-4">
-          <div className="relative mb-4">
-            <div className={`w-24 h-24 rounded-full bg-white border-4 ${iconBorder} shadow-xl flex items-center justify-center text-3xl font-bold overflow-hidden`}>
-              {partnerInfo?.photoUrl ? <img src={partnerInfo.photoUrl} alt={partnerName} className="w-full h-full object-cover" /> : <span className={partnerName === '勇太' ? 'text-indigo-600' : 'text-rose-500'}>{partnerName ? partnerName.charAt(0) : '?'}</span>}
-            </div>
-            <div className={`absolute bottom-0 right-0 w-6 h-6 border-4 border-white rounded-full ${badgeColor} z-20`}></div>
-          </div>
-          <p className="font-bold text-2xl mb-1">{partnerName}</p>
-          
-          {partnerInfo?.goal && (
-             <div className="mt-2 bg-black/20 px-4 py-2 rounded-xl text-sm font-bold backdrop-blur-sm w-full max-w-[280px]">
-                <p className="text-white/80 text-xs mb-1">目標</p>
-                <p className="text-white break-words">{partnerInfo.goal}</p>
-             </div>
-          )}
+    <div className="space-y-6 animate-in fade-in">
+      <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-6">フレンド</h2>
+      
+      <div className="flex bg-slate-200 dark:bg-slate-800 p-1 rounded-xl mb-6">
+        <button onClick={() => setActiveTab('friends')} className={`flex-1 py-2 text-sm font-bold text-center rounded-lg transition-colors ${activeTab === 'friends' ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'}`}>フレンド一覧</button>
+        <button onClick={() => setActiveTab('add')} className={`flex-1 py-2 text-sm font-bold text-center rounded-lg transition-colors ${activeTab === 'add' ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'}`}>フレンド追加</button>
+      </div>
 
-          {isTraining ? (
-            <div className="mt-4 flex flex-col items-center gap-1.5 bg-black/30 px-4 py-2.5 rounded-2xl text-sm font-bold backdrop-blur-sm">
-                <div className="flex items-center gap-2"><Flame size={16} className={`${isOnline ? 'text-amber-300 animate-pulse' : 'text-slate-400'}`} /> トレーニング中 {isOnline ? '(オンライン)' : '(オフライン)'} <TimerDisplay startTime={partnerInfo.trainingStartTime} /></div>
-                {partnerInfo.currentExerciseName && <div className="text-[10px] text-amber-100 opacity-90 border-t border-white/20 pt-1 mt-1 w-full text-center">現在: {partnerInfo.currentExerciseName}</div>}
+      {activeTab === 'add' && (
+        <form onSubmit={handleSearchSubmit} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm">
+          <h3 className="text-sm font-bold text-slate-700 dark:text-slate-300 mb-4 flex items-center gap-2">
+             <UserPlus size={18} className="text-emerald-500" /> ユーザー名で検索
+          </h3>
+          <div className="flex gap-2">
+            <input type="text" value={searchUsername} onChange={e => setSearchUsername(e.target.value)} required placeholder="ユーザー名を入力" className="flex-1 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 text-slate-800 dark:text-slate-100 focus:border-emerald-500 focus:outline-none text-base" style={{ fontSize: '16px' }}/>
+            <button type="submit" disabled={!searchUsername.trim()} className="bg-emerald-500 hover:bg-emerald-600 text-white font-bold px-6 rounded-xl transition-colors disabled:opacity-50 shadow-sm">追加</button>
+          </div>
+          <p className="text-xs text-slate-400 dark:text-slate-500 mt-3 font-bold">※追加したフレンドの記録はタイムラインやデータ画面に表示されます。</p>
+        </form>
+      )}
+
+      {activeTab === 'friends' && (
+        <div className="space-y-4">
+          {myFriends.length === 0 ? (
+            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-8 text-center shadow-sm">
+              <Users className="mx-auto text-slate-300 dark:text-slate-600 w-12 h-12 mb-4" />
+              <p className="text-slate-500 dark:text-slate-400 font-bold">フレンドがいません。</p>
+              <button onClick={() => setActiveTab('add')} className="mt-4 text-emerald-500 font-bold text-sm bg-emerald-50 dark:bg-emerald-950/50 px-4 py-2 rounded-full border border-emerald-100 dark:border-emerald-900">フレンドを追加する</button>
             </div>
-          ) : isOnline ? (
-            <div className="mt-4 inline-flex items-center gap-2 bg-black/30 px-4 py-1.5 rounded-full text-sm font-bold backdrop-blur-sm"><Circle fill="currentColor" size={10} className="text-emerald-300 animate-pulse" /> オンライン</div>
           ) : (
-            <div className="mt-4 inline-flex items-center gap-2 bg-black/20 px-4 py-1.5 rounded-full text-sm font-bold backdrop-blur-sm text-slate-200"><Circle fill="currentColor" size={10} className="text-slate-300" /> オフライン</div>
-          )}
-          {!isOnline && (
-            <div className="mt-2 text-xs font-bold text-white/70">
-              最終アクセス: {getTimeAgo(lastActive)}
-            </div>
+            myFriends.map(friendUsername => {
+              const friendInfo = accountsInfo[friendUsername];
+              if (!friendInfo) return null;
+              
+              const isTraining = friendInfo.isTraining;
+              const lastActive = friendInfo.lastActive || 0;
+              const isAppOnline = friendInfo.isAppOnline !== false;
+              const isOnline = isAppOnline && lastActive > 0 && (currentTime - lastActive < 45000);
+
+              return (
+                <div key={friendUsername} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-sm flex items-center justify-between group">
+                  <div className="flex items-center gap-4">
+                    <div className="relative">
+                      <div className="w-12 h-12 rounded-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center text-xl font-bold text-slate-600 dark:text-slate-300 overflow-hidden">
+                        {friendInfo.photoUrl ? <img src={friendInfo.photoUrl} alt={friendUsername} className="w-full h-full object-cover" /> : friendUsername.charAt(0).toUpperCase()}
+                      </div>
+                      <div className={`absolute bottom-0 right-0 w-3.5 h-3.5 border-2 border-white dark:border-slate-900 rounded-full z-10 ${isTraining ? 'bg-amber-400' : isOnline ? 'bg-emerald-400' : 'bg-slate-400'}`}></div>
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-slate-800 dark:text-slate-100">{friendUsername}</h3>
+                      {isTraining ? (
+                        <p className="text-xs text-amber-500 font-bold flex items-center gap-1"><Flame size={12}/>トレーニング中 {friendInfo.currentExerciseName ? `- ${friendInfo.currentExerciseName}` : ''}</p>
+                      ) : isOnline ? (
+                        <p className="text-xs text-emerald-500 font-bold">オンライン</p>
+                      ) : (
+                        <p className="text-xs text-slate-400 font-bold">最終アクセス: {getTimeAgo(lastActive)}</p>
+                      )}
+                    </div>
+                  </div>
+                  <button onClick={() => onRemoveFriend(friendUsername)} className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/50 rounded-full transition-colors opacity-100 sm:opacity-0 sm:group-hover:opacity-100">
+                    <Trash2 size={18} />
+                  </button>
+                </div>
+              );
+            })
           )}
         </div>
-      </div>
+      )}
 
-      <div className="bg-gradient-to-br from-indigo-600 to-purple-600 rounded-3xl p-6 text-white shadow-lg relative overflow-hidden">
-         <div className="absolute top-2 right-2 text-white/20"><Trophy size={80}/></div>
-         <div className="relative z-10">
-           <h3 className="font-bold text-lg flex items-center gap-2 mb-2"><Target size={20}/> 今月のふたりで500トンチャレンジ！</h3>
-           <p className="text-xs text-indigo-100 font-bold mb-4">ふたりの合計総負荷量で500,000kgを目指そう！</p>
-           
-           <div className="flex justify-between items-end mb-2">
-              <span className="text-2xl font-bold">{totalMonthVolume.toLocaleString()} <span className="text-sm font-normal">kg</span></span>
-              <span className="text-sm font-bold text-indigo-200">/ 500,000 kg</span>
-           </div>
-           
-           <div className="w-full h-4 bg-black/30 rounded-full overflow-hidden flex">
-              <div className="h-full bg-emerald-400 transition-all duration-1000" style={{ width: `${myPercent}%` }}></div>
-              <div className="h-full bg-rose-400 transition-all duration-1000" style={{ width: `${partnerPercent}%` }}></div>
-           </div>
-           
-           <div className="flex justify-between items-center mt-3 text-xs font-bold">
-              <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded bg-emerald-400"></div>{currentUser}: {myMonthVolume.toLocaleString()}kg</div>
-              <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded bg-rose-400"></div>{partnerName}: {partnerMonthVolume.toLocaleString()}kg</div>
-           </div>
-         </div>
-      </div>
-
-      <div className="mt-8">
-         <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4">{partnerName}の月間レポート ({currentMonth + 1}月)</h3>
-         <MonthlyReport monthDate={new Date(currentYear, currentMonth, 1)} posts={posts} userName={partnerName} accountsInfo={accountsInfo} />
-      </div>
-
-      <div className="mt-8">
-         <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4">基礎代謝・体組成データ</h3>
-         <BodyCompositionInfo info={partnerCompositionInfo} dailyCalories={partnerDailyCalories} dateLabel={dateLabel} />
-      </div>
-
-      <div className="space-y-6 pt-8">
-         <h3 className="text-lg font-bold text-slate-800 dark:text-white">{partnerName}のデータ</h3>
-         <SimpleChart data={weightData} color="#10b981" title="体重の推移 (kg)" />
-         <SimpleChart data={fatData} color="#6366f1" title="体脂肪率の推移 (%)" />
-      </div>
-
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 mt-8 shadow-sm">
-        <h3 className="text-slate-700 dark:text-slate-300 font-bold mb-3 text-sm">システムステータス</h3>
-        <ul className="space-y-3 text-sm font-bold">
-          <li className="flex items-center justify-between">
-            <span className="text-slate-500 dark:text-slate-400">ネットワーク接続</span>
-            <span className="text-slate-700 dark:text-slate-200 flex items-center gap-1">
-              {typeof navigator !== 'undefined' && navigator.onLine ? <span className="text-emerald-600 dark:text-emerald-400 flex items-center gap-1 bg-emerald-50 dark:bg-emerald-950/50 px-2 py-1 rounded-md"><Activity size={14}/> 良好</span> : <span className="text-rose-500 dark:text-rose-400 flex items-center gap-1 bg-rose-50 dark:bg-rose-950/50 px-2 py-1 rounded-md"><X size={14}/> オフライン</span>}
-            </span>
-          </li>
-          <li className="flex items-center justify-between border-t border-slate-100 dark:border-slate-800 pt-3">
-            <span className="text-slate-500 dark:text-slate-400">データ保存先</span>
-            <a href={`https://console.firebase.google.com/project/${FIREBASE_PROJECT_ID}/firestore/data`} target="_blank" rel="noreferrer" className="text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 text-xs bg-emerald-50 dark:bg-emerald-950/50 hover:bg-emerald-100 dark:hover:bg-emerald-900 border border-emerald-100 dark:border-emerald-800 px-2 py-1 rounded-md transition-colors">Firestore データを確認</a>
-          </li>
-        </ul>
-      </div>
-
-      <div className="mt-12 text-center pb-4 border-t border-slate-200/50 dark:border-slate-800/50 pt-6">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">DuoFit v2.0.0 (2026.7.13, 15:51, updated)</p>
-        <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 mt-1">© 2026 Yuta Michitsuji. All rights reserved.</p>
+      <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0</p>
       </div>
     </div>
   );
 }
+
 // --- ナビゲーションボタン ---
 function NavButton({ icon, label, isActive, onClick, isPrimary, isTraining }) {
   if (isPrimary) {

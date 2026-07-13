@@ -1,5 +1,5 @@
 @echo off
-cd C:\Users\kappa\duofit-app
+cd C:\Users\kappa\WithFit
 
 if exist src\changes.json (
     node src\apply_changes.js
