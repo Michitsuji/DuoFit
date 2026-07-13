@@ -599,7 +599,7 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
 }
 
 // --- 共通コンポーネント：ワークアウト入力フォーム ---
-function WorkoutItemForm({ item, index, isFirst, isLast, availableExercises, updateItem, removeItem, moveItemUp, moveItemDown, addSet, removeSet, updateSet, addDropSet, removeDropSet, updateDropSet, reorderSet, myPastPosts, onActive }) {
+function WorkoutItemForm({ item, index, availableExercises, updateItem, removeItem, addSet, removeSet, updateSet, addDropSet, removeDropSet, updateDropSet, reorderSet, myPastPosts, onActive, isDragging, dragHandleProps }) {
   const [localFilter, setLocalFilter] = useState('all');
   const [draggedSetIndex, setDraggedSetIndex] = useState(null);
   const [dragOverSetIndex, setDragOverSetIndex] = useState(null);
@@ -817,9 +817,11 @@ function WorkoutItemForm({ item, index, isFirst, isLast, availableExercises, upd
     <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-sm relative w-full overflow-hidden mb-6 transition-all duration-200" onClickCapture={() => onActive && onActive(item.exerciseName)}>
       <div className="flex justify-between items-start mb-4">
         <div className="flex items-start gap-1.5 flex-1 min-w-0">
-          <div className="flex flex-col gap-0.5 mt-2">
-            <button onClick={() => moveItemUp(index)} disabled={isFirst} className="p-1 text-slate-400 hover:text-emerald-500 disabled:opacity-30 bg-slate-50 dark:bg-slate-800 rounded transition-colors"><ArrowUp size={14}/></button>
-            <button onClick={() => moveItemDown(index)} disabled={isLast} className="p-1 text-slate-400 hover:text-emerald-500 disabled:opacity-30 bg-slate-50 dark:bg-slate-800 rounded transition-colors"><ArrowDown size={14}/></button>
+          <div 
+            className="mt-2 p-1.5 cursor-grab active:cursor-grabbing text-slate-300 hover:text-emerald-500 rounded bg-slate-50 dark:bg-slate-800 touch-none shrink-0"
+            {...dragHandleProps}
+          >
+            <GripVertical size={20}/>
           </div>
           <div className="flex flex-col flex-1 min-w-0 ml-1 gap-2">
             <div className="flex flex-wrap bg-slate-100 dark:bg-slate-800/50 p-1 rounded-lg gap-1">
@@ -844,6 +846,7 @@ function WorkoutItemForm({ item, index, isFirst, isLast, availableExercises, upd
         <button onClick={() => removeItem(item.id)} className="ml-2 text-slate-400 hover:text-rose-500 p-2 flex-shrink-0 bg-slate-50 dark:bg-slate-800 rounded-lg transition-colors mt-2"><Trash2 size={18} /></button>
       </div>
 
+      <div className={`transition-all overflow-hidden ${isDragging ? 'h-0 opacity-0' : 'h-auto opacity-100'}`}>
       {prevRecord && (
         <div className="mb-4 pl-8 text-xs font-bold text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-950/50 p-2 rounded-lg border border-slate-100 dark:border-slate-800">
           <span className="text-emerald-600 dark:text-emerald-400 mr-2 flex items-center inline-flex gap-1"><Clock size={12}/>前回 ({formatDateWithDay(prevRecord.date)})</span>
@@ -911,8 +914,9 @@ function WorkoutItemForm({ item, index, isFirst, isLast, availableExercises, upd
             onDragLeave={handleDragLeave}
             onDrop={(e) => handleDrop(e, sIndex)}
             onDragEnd={handleDragEnd}
-            className={`bg-slate-50/50 dark:bg-slate-950/50 p-2.5 rounded-xl border transition-all ${draggedSetIndex === sIndex ? 'opacity-40 border-emerald-500 border-dashed' : dragOverSetIndex === sIndex ? 'border-emerald-500 shadow-[0_-4px_0_0_#10b981]' : 'border-slate-100 dark:border-slate-800'} space-y-3`}
+            className={`bg-slate-50/50 dark:bg-slate-950/50 p-2.5 rounded-xl border transition-all relative ${draggedSetIndex === sIndex ? 'opacity-40' : 'border-slate-100 dark:border-slate-800'} space-y-3`}
           >
+            {dragOverSetIndex === sIndex && <div className="absolute -top-2 left-0 w-full h-1 bg-emerald-500 rounded-full z-10 shadow-[0_0_8px_rgba(16,185,129,0.8)] animate-pulse" />}
             <div className="flex items-center gap-2">
               <div 
                  className="cursor-grab active:cursor-grabbing text-slate-300 hover:text-emerald-500 p-1 -ml-1 shrink-0 touch-none"
@@ -1016,11 +1020,86 @@ function WorkoutItemForm({ item, index, isFirst, isLast, availableExercises, upd
       <div>
         <textarea value={item.memo || ''} onChange={(e) => updateItem(item.id, { memo: e.target.value })} placeholder="種目ごとのメモ（オプション）" className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-3 text-sm text-slate-700 dark:text-slate-200 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 focus:outline-none resize-none" style={{ fontSize: '16px' }} rows={2} />
       </div>
+      </div>
     </div>
   );
 }
 
 // --- スクロール自動制御フック ---
+function useDragAndDrop(items, setItems) {
+  const [draggedIndex, setDraggedIndex] = useState(null);
+  const [dragOverIndex, setDragOverIndex] = useState(null);
+  const [draggableId, setDraggableId] = useState(null);
+  const refs = useRef([]);
+
+  const handleDragStart = (e, idx) => {
+    setDraggedIndex(idx);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+  const handleDragOver = (e, idx) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    if (dragOverIndex !== idx) setDragOverIndex(idx);
+  };
+  const handleDragLeave = () => setDragOverIndex(null);
+  const handleDrop = (e, idx) => {
+    e.preventDefault();
+    if (draggedIndex !== null && draggedIndex !== idx) {
+      setItems(prev => {
+        const newItems = [...prev];
+        const [dragged] = newItems.splice(draggedIndex, 1);
+        newItems.splice(idx, 0, dragged);
+        return newItems;
+      });
+    }
+    setDraggedIndex(null);
+    setDragOverIndex(null);
+  };
+  const handleDragEnd = () => {
+    setDraggedIndex(null);
+    setDragOverIndex(null);
+    setDraggableId(null);
+  };
+  const handleTouchStart = (e, idx) => {
+    setDraggedIndex(idx);
+    document.body.style.overflow = 'hidden';
+  };
+  const handleTouchMove = (e) => {
+    if (draggedIndex === null) return;
+    const y = e.touches[0].clientY;
+    let hoverIndex = dragOverIndex;
+    refs.current.forEach((el, idx) => {
+       if (!el) return;
+       const rect = el.getBoundingClientRect();
+       if (y >= rect.top && y <= rect.bottom) hoverIndex = idx;
+    });
+    if (hoverIndex !== null && hoverIndex !== dragOverIndex) setDragOverIndex(hoverIndex);
+  };
+  const handleTouchEnd = () => {
+    if (draggedIndex !== null && dragOverIndex !== null && draggedIndex !== dragOverIndex) {
+      setItems(prev => {
+        const newItems = [...prev];
+        const [dragged] = newItems.splice(draggedIndex, 1);
+        newItems.splice(dragOverIndex, 0, dragged);
+        return newItems;
+      });
+    }
+    setDraggedIndex(null);
+    setDragOverIndex(null);
+    setDraggableId(null);
+    document.body.style.overflow = '';
+  };
+
+  return {
+    draggedIndex, dragOverIndex, draggableId, setDraggableId, refs,
+    handlers: {
+      onDragStart: handleDragStart, onDragOver: handleDragOver, onDragLeave: handleDragLeave,
+      onDrop: handleDrop, onDragEnd: handleDragEnd, onTouchStart: handleTouchStart,
+      onTouchMove: handleTouchMove, onTouchEnd: handleTouchEnd, onTouchCancel: handleTouchEnd
+    }
+  };
+}
+
 function useAutoScrollDisable() {
   useEffect(() => {
     const checkScroll = () => {
@@ -2075,6 +2154,7 @@ function DataView({ posts, currentUser, partnerName, accountsInfo, onEdit, onDel
 // --- 記録入力画面 ---
 function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workoutItems, setWorkoutItems, selectedCategories, setSelectedCategories, posts, currentUser, isManual, setIsManual, onActiveExerciseChange }) {
   const [selectedGymId, setSelectedGymId] = useState(myInfo.currentGymId || (gyms.filter(g => g.id !== 'common')[0]?.id || ''));
+  const itemDnd = useDragAndDrop(workoutItems, setWorkoutItems);
   const [restTimerStart, setRestTimerStart] = useState(null);
   const [restTimeElapsed, setRestTimeElapsed] = useState(0);
 
@@ -2411,27 +2491,43 @@ function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workou
 
       <div className="space-y-4">
         {workoutItems.map((item, index) => (
-           <WorkoutItemForm 
-             key={item.id} 
-             item={item} 
-             index={index}
-             isFirst={index === 0}
-             isLast={index === workoutItems.length - 1}
-             availableExercises={availableExercises} 
-             updateItem={updateItem} 
-             removeItem={removeExerciseItem}
-             moveItemUp={moveItemUp}
-             moveItemDown={moveItemDown}
-             addSet={addSet} 
-             removeSet={removeSet} 
-             updateSet={updateSetField} 
-             addDropSet={addDropSet} 
-             removeDropSet={removeDropSet} 
-             updateDropSet={updateDropSetField}
-             reorderSet={reorderSet}
-             myPastPosts={myPastPosts}
-             onActive={onActiveExerciseChange}
-           />
+          <div key={item.id}
+             ref={(el) => (itemDnd.refs.current[index] = el)}
+             draggable={itemDnd.draggableId === item.id}
+             onDragStart={(e) => itemDnd.handlers.onDragStart(e, index)}
+             onDragOver={(e) => itemDnd.handlers.onDragOver(e, index)}
+             onDragLeave={itemDnd.handlers.onDragLeave}
+             onDrop={(e) => itemDnd.handlers.onDrop(e, index)}
+             onDragEnd={itemDnd.handlers.onDragEnd}
+             className={`relative transition-all duration-200 ${itemDnd.draggedIndex === index ? 'opacity-70 scale-[0.98]' : ''}`}
+          >
+             {itemDnd.dragOverIndex === index && <div className="absolute -top-3 left-0 w-full h-1.5 bg-emerald-500 rounded-full z-10 shadow-[0_0_8px_rgba(16,185,129,0.8)] animate-pulse" />}
+             <WorkoutItemForm 
+               item={item} 
+               index={index}
+               availableExercises={availableExercises} 
+               updateItem={updateItem} 
+               removeItem={removeExerciseItem}
+               addSet={addSet} 
+               removeSet={removeSet} 
+               updateSet={updateSetField} 
+               addDropSet={addDropSet} 
+               removeDropSet={removeDropSet} 
+               updateDropSet={updateDropSetField}
+               reorderSet={reorderSet}
+               myPastPosts={myPastPosts}
+               onActive={onActiveExerciseChange}
+               isDragging={itemDnd.draggedIndex === index}
+               dragHandleProps={{
+                 onMouseEnter: () => itemDnd.setDraggableId(item.id),
+                 onMouseLeave: () => itemDnd.setDraggableId(null),
+                 onTouchStart: (e) => { itemDnd.setDraggableId(item.id); itemDnd.handlers.onTouchStart(e, index); },
+                 onTouchMove: itemDnd.handlers.onTouchMove,
+                 onTouchEnd: itemDnd.handlers.onTouchEnd,
+                 onTouchCancel: itemDnd.handlers.onTouchCancel
+               }}
+             />
+          </div>
         ))}
 
         <button onClick={() => addExerciseItem()} className="w-full py-4 bg-slate-100 dark:bg-slate-900 text-slate-700 dark:text-slate-300 rounded-xl text-sm font-bold flex items-center justify-center gap-2 hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors border border-slate-200 dark:border-slate-800"><ListPlus size={18} /> 次の種目を追加</button>
@@ -2464,6 +2560,7 @@ function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workou
 function EditWorkoutModal({ post, gyms, exercises, onClose, onSave, myPastPosts }) {
   const safeItems = post.items ? JSON.parse(JSON.stringify(post.items)) : [];
   const [workoutItems, setWorkoutItems] = useState(safeItems);
+  const itemDnd = useDragAndDrop(workoutItems, setWorkoutItems);
   
   const [editDate, setEditDate] = useState(formatDateFromTimestamp(post.startTime || post.timestamp));
   const [editStartTime, setEditStartTime] = useState(formatTimeFromTimestamp(post.startTime || post.timestamp));
@@ -3150,7 +3247,7 @@ function FriendsView({ partnerName, partnerInfo, currentUser, posts, accountsInf
       </div>
 
       <div className="mt-12 text-center pb-4 border-t border-slate-200/50 dark:border-slate-800/50 pt-6">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">DuoFit v2.0.0 (2026.7.13, 13:54, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">DuoFit v2.0.0 (2026.7.13, 14:01, updated)</p>
         <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 mt-1">© 2026 Yuta Michitsuji. All rights reserved.</p>
       </div>
     </div>
