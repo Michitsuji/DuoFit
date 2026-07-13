@@ -609,6 +609,8 @@ function WorkoutItemForm({ item, index, availableExercises, updateItem, removeIt
   const adjustPosition = (idx) => {
     const el = setRefs.current[idx];
     if (!el) return;
+    const container = document.getElementById('edit-modal-scroll-container') || window;
+    const isWindow = container === window;
     const initialTop = el.getBoundingClientRect().top;
 
     requestAnimationFrame(() => {
@@ -617,20 +619,29 @@ function WorkoutItemForm({ item, index, availableExercises, updateItem, removeIt
         if (!currentEl) return;
         
         const currentTop = currentEl.getBoundingClientRect().top;
-        window.scrollBy({ top: currentTop - initialTop, behavior: 'instant' });
+        container.scrollBy({ top: currentTop - initialTop, behavior: 'instant' });
 
         setTimeout(() => {
           const rect = currentEl.getBoundingClientRect();
-          const scrollTop = window.scrollY || document.documentElement.scrollTop;
-          const absoluteTop = rect.top + scrollTop;
-          const windowHeight = window.innerHeight;
           const totalItems = item.sets ? item.sets.length : 1;
-          
           const ratio = totalItems > 1 ? idx / (totalItems - 1) : 0.5;
-          const targetViewportY = windowHeight * (0.15 + 0.7 * ratio);
-          const targetScrollY = absoluteTop - targetViewportY + (rect.height / 2);
           
-          window.scrollTo({ top: targetScrollY, behavior: 'smooth' });
+          if (isWindow) {
+            const scrollTop = window.scrollY || document.documentElement.scrollTop;
+            const absoluteTop = rect.top + scrollTop;
+            const windowHeight = window.innerHeight;
+            const targetViewportY = windowHeight * (0.15 + 0.7 * ratio);
+            const targetScrollY = absoluteTop - targetViewportY + (rect.height / 2);
+            window.scrollTo({ top: targetScrollY, behavior: 'smooth' });
+          } else {
+            const containerRect = container.getBoundingClientRect();
+            const scrollTop = container.scrollTop;
+            const absoluteTop = (rect.top - containerRect.top) + scrollTop;
+            const containerHeight = container.clientHeight;
+            const targetViewportY = containerHeight * (0.15 + 0.7 * ratio);
+            const targetScrollY = absoluteTop - targetViewportY + (rect.height / 2);
+            container.scrollTo({ top: targetScrollY, behavior: 'smooth' });
+          }
         }, 50);
       }, 50);
     });
@@ -1108,6 +1119,8 @@ function useDragAndDrop(items, setItems) {
   const adjustPosition = (idx) => {
     const el = refs.current[idx];
     if (!el) return;
+    const container = document.getElementById('edit-modal-scroll-container') || window;
+    const isWindow = container === window;
     const initialTop = el.getBoundingClientRect().top;
 
     requestAnimationFrame(() => {
@@ -1117,23 +1130,32 @@ function useDragAndDrop(items, setItems) {
         
         // 1. 折りたたみによる高さ変化分を瞬時に補正し、カーソルや指から要素が逃げないようにする
         const currentTop = currentEl.getBoundingClientRect().top;
-        window.scrollBy({ top: currentTop - initialTop, behavior: 'instant' });
+        container.scrollBy({ top: currentTop - initialTop, behavior: 'instant' });
 
         // 2. その後、リスト内のインデックスに応じて画面内の適切な位置にヌルっと移動させる
         setTimeout(() => {
           const rect = currentEl.getBoundingClientRect();
-          const scrollTop = window.scrollY || document.documentElement.scrollTop;
-          const absoluteTop = rect.top + scrollTop;
-          const windowHeight = window.innerHeight;
           const totalItems = items.length;
           
           // 要素が全体のどの位置にいるか (0: 先頭, 1: 末尾)
           const ratio = totalItems > 1 ? idx / (totalItems - 1) : 0.5;
-          // 画面の 15% 〜 85% の位置を目標にする (上なら上寄り、下なら下寄り)
-          const targetViewportY = windowHeight * (0.15 + 0.7 * ratio);
-          const targetScrollY = absoluteTop - targetViewportY + (rect.height / 2);
           
-          window.scrollTo({ top: targetScrollY, behavior: 'smooth' });
+          if (isWindow) {
+            const scrollTop = window.scrollY || document.documentElement.scrollTop;
+            const absoluteTop = rect.top + scrollTop;
+            const windowHeight = window.innerHeight;
+            const targetViewportY = windowHeight * (0.15 + 0.7 * ratio);
+            const targetScrollY = absoluteTop - targetViewportY + (rect.height / 2);
+            window.scrollTo({ top: targetScrollY, behavior: 'smooth' });
+          } else {
+            const containerRect = container.getBoundingClientRect();
+            const scrollTop = container.scrollTop;
+            const absoluteTop = (rect.top - containerRect.top) + scrollTop;
+            const containerHeight = container.clientHeight;
+            const targetViewportY = containerHeight * (0.15 + 0.7 * ratio);
+            const targetScrollY = absoluteTop - targetViewportY + (rect.height / 2);
+            container.scrollTo({ top: targetScrollY, behavior: 'smooth' });
+          }
         }, 50);
       }, 50);
     });
@@ -2775,7 +2797,7 @@ function EditWorkoutModal({ post, gyms, exercises, onClose, onSave, myPastPosts 
           <button onClick={onClose} className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 bg-slate-100 dark:bg-slate-800 rounded-full"><X size={20} /></button>
         </div>
         
-        <div className="flex-1 overflow-y-auto p-4 space-y-6 pb-24">
+        <div id="edit-modal-scroll-container" className="flex-1 overflow-y-auto p-4 space-y-6 pb-24">
           <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-sm mb-6 space-y-4">
             <h3 className="text-sm font-bold text-slate-700 dark:text-slate-300 flex items-center gap-2">
               <Settings size={16} className="text-slate-400" /> トレーニング情報
@@ -3400,7 +3422,7 @@ function FriendsView({ partnerName, partnerInfo, currentUser, posts, accountsInf
       </div>
 
       <div className="mt-12 text-center pb-4 border-t border-slate-200/50 dark:border-slate-800/50 pt-6">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">DuoFit v2.0.0 (2026.7.13, 15:48, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">DuoFit v2.0.0 (2026.7.13, 15:51, updated)</p>
         <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 mt-1">© 2026 Yuta Michitsuji. All rights reserved.</p>
       </div>
     </div>
