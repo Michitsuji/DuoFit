@@ -603,10 +603,36 @@ function WorkoutItemForm({ item, index, isFirst, isLast, availableExercises, upd
   const [draggedSetIndex, setDraggedSetIndex] = useState(null);
   const [dragOverSetIndex, setDragOverSetIndex] = useState(null);
   const [draggableSetId, setDraggableSetId] = useState(null);
+  const setRefs = useRef([]);
 
   const handleDragStart = (e, idx) => {
     setDraggedSetIndex(idx);
     e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleTouchStart = (e, idx) => {
+    setDraggedSetIndex(idx);
+    document.body.style.overflow = 'hidden';
+  };
+  const handleTouchMove = (e) => {
+    if (draggedSetIndex === null) return;
+    const y = e.touches[0].clientY;
+    let hoverIndex = dragOverSetIndex;
+    setRefs.current.forEach((el, idx) => {
+       if (!el) return;
+       const rect = el.getBoundingClientRect();
+       if (y >= rect.top && y <= rect.bottom) hoverIndex = idx;
+    });
+    if (hoverIndex !== null && hoverIndex !== dragOverSetIndex) setDragOverSetIndex(hoverIndex);
+  };
+  const handleTouchEnd = () => {
+    if (draggedSetIndex !== null && dragOverSetIndex !== null && draggedSetIndex !== dragOverSetIndex) {
+       if (reorderSet) reorderSet(item.id, draggedSetIndex, dragOverSetIndex);
+    }
+    setDraggedSetIndex(null);
+    setDragOverSetIndex(null);
+    setDraggableSetId(null);
+    document.body.style.overflow = '';
   };
   const handleDragOver = (e, idx) => {
     e.preventDefault();
@@ -877,6 +903,7 @@ function WorkoutItemForm({ item, index, isFirst, isLast, availableExercises, upd
         
         {item.sets && Array.isArray(item.sets) && item.sets.map((set, sIndex) => (
           <div key={set.id} 
+            ref={(el) => (setRefs.current[sIndex] = el)}
             draggable={draggableSetId === set.id}
             onDragStart={(e) => handleDragStart(e, sIndex)}
             onDragOver={(e) => handleDragOver(e, sIndex)}
@@ -887,11 +914,13 @@ function WorkoutItemForm({ item, index, isFirst, isLast, availableExercises, upd
           >
             <div className="flex items-center gap-2">
               <div 
-                 className="cursor-grab active:cursor-grabbing text-slate-300 hover:text-emerald-500 p-1 -ml-1 shrink-0"
+                 className="cursor-grab active:cursor-grabbing text-slate-300 hover:text-emerald-500 p-1 -ml-1 shrink-0 touch-none"
                  onMouseEnter={() => setDraggableSetId(set.id)}
                  onMouseLeave={() => setDraggableSetId(null)}
-                 onTouchStart={() => setDraggableSetId(set.id)}
-                 onTouchEnd={() => setDraggableSetId(null)}
+                 onTouchStart={(e) => handleTouchStart(e, sIndex)}
+                 onTouchMove={handleTouchMove}
+                 onTouchEnd={handleTouchEnd}
+                 onTouchCancel={handleTouchEnd}
               >
                 <GripVertical size={16} />
               </div>
@@ -3118,7 +3147,7 @@ function FriendsView({ partnerName, partnerInfo, currentUser, posts, accountsInf
       </div>
 
       <div className="mt-12 text-center pb-4 border-t border-slate-200/50 dark:border-slate-800/50 pt-6">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">DuoFit v2.0.0 (2026.7.13, 13:36, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">DuoFit v2.0.0 (2026.7.13, 13:42, updated)</p>
         <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 mt-1">© 2026 Yuta Michitsuji. All rights reserved.</p>
       </div>
     </div>
