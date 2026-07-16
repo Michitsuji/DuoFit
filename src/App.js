@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Heart, Home, PlusCircle, Users, Dumbbell, LogOut, Activity, Flame, Lock, Settings, Trash2, Plus, X, ListPlus, MapPin, Clock, Play, Circle, Edit2, KeyRound, AlignLeft, Scale, Calendar as CalendarIcon, Zap, TrendingDown, Copy, Moon, Sun, Target, Trophy, ArrowUp, ArrowDown, Award, Droplet, Sparkles, GripVertical } from 'lucide-react';
+import { Heart, Home, PlusCircle, Users, Dumbbell, LogOut, Activity, Flame, Lock, Settings, Trash2, Plus, X, ListPlus, MapPin, Clock, Play, Circle, Edit2, KeyRound, AlignLeft, Scale, Calendar as CalendarIcon, Zap, TrendingDown, Copy, Moon, Sun, Target, Trophy, ArrowUp, ArrowDown, Award, Droplet, Sparkles, GripVertical, Download } from 'lucide-react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
-import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot, enableIndexedDbPersistence, getDoc, deleteField, limit, query, orderBy } from 'firebase/firestore';
+import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot, enableIndexedDbPersistence, getDoc, deleteField, limit, query, orderBy, getDocs, where } from 'firebase/firestore';
 
 // --- Firebase 初期化 ---
 let app, auth, db, appId = 'duofit-app';
@@ -1618,6 +1618,75 @@ export default function App() {
     }
   };
 
+  const handleTransferToWithFit = async () => {
+    if (!currentUser || !db) return { success: false, message: 'エラーが発生しました' };
+    try {
+      const myInfo = accountsInfo[currentUser];
+      const withFitAccRef = doc(db, 'artifacts', 'withfit-app', 'public', 'data', 'accounts', currentUser);
+      const withFitAccSnap = await getDoc(withFitAccRef);
+      
+      if (!withFitAccSnap.exists()) {
+         await setDoc(withFitAccRef, {
+           displayName: currentUser,
+           pin: myInfo.pin || '',
+           friendCode: Math.floor(10000 + Math.random() * 90000).toString(),
+           isTraining: false,
+           lastActive: Date.now(),
+           theme: myInfo.theme || 'light',
+           gender: myInfo.gender || 'male',
+           birthDate: myInfo.birthDate || '',
+           friends: [],
+           joinedGyms: ['common']
+         });
+      } else {
+         await setDoc(withFitAccRef, { pin: myInfo.pin || '' }, { merge: true });
+      }
+
+      const gymsRef = collection(db, 'artifacts', appId, 'public', 'data', 'gyms');
+      const gymsSnap = await getDocs(gymsRef);
+      const gymPromises = gymsSnap.docs.map(async d => {
+          const data = d.data();
+          if (d.id !== 'common') {
+              const withFitGymRef = doc(db, 'artifacts', 'withfit-app', 'public', 'data', 'gyms', d.id);
+              const withFitGymSnap = await getDoc(withFitGymRef);
+              let members = data.members || [];
+              if (withFitGymSnap.exists()) {
+                  members = withFitGymSnap.data().members || [];
+                  if (!members.includes(currentUser)) members.push(currentUser);
+              }
+              return setDoc(withFitGymRef, { ...data, members }, { merge: true });
+          }
+      });
+      await Promise.all(gymPromises);
+
+      const updatedWithFitAccSnap = await getDoc(withFitAccRef);
+      const currentJoined = updatedWithFitAccSnap.data()?.joinedGyms || ['common'];
+      const myDuoFitGyms = myInfo.joinedGyms || ['common'];
+      const newJoined = [...new Set([...currentJoined, ...myDuoFitGyms])];
+      await setDoc(withFitAccRef, { joinedGyms: newJoined }, { merge: true });
+
+      const exRef = collection(db, 'artifacts', appId, 'public', 'data', 'exercises');
+      const exSnap = await getDocs(exRef);
+      const exPromises = exSnap.docs.map(d => {
+          return setDoc(doc(db, 'artifacts', 'withfit-app', 'public', 'data', 'exercises', d.id), d.data(), { merge: true });
+      });
+      await Promise.all(exPromises);
+
+      const workoutsRef = collection(db, 'artifacts', appId, 'public', 'data', 'workouts');
+      const q = query(workoutsRef, where('author', '==', currentUser));
+      const workoutsSnap = await getDocs(q);
+      const workoutPromises = workoutsSnap.docs.map(d => {
+          return setDoc(doc(db, 'artifacts', 'withfit-app', 'public', 'data', 'workouts', d.id), d.data(), { merge: true });
+      });
+      await Promise.all(workoutPromises);
+
+      return { success: true };
+    } catch (error) {
+      console.error(error);
+      return { success: false, message: '通信エラーが発生しました' };
+    }
+  };
+
   if (!isFullyLoaded) {
     return (
       <div className="h-screen overflow-hidden bg-slate-50 dark:bg-slate-950 flex flex-col items-center justify-center p-6">
@@ -1734,7 +1803,7 @@ export default function App() {
         {currentTab === 'exercises' && <ExercisesView gyms={allGyms} exercises={exercises} posts={posts} accountsInfo={accountsInfo} />}
         {currentTab === 'record' && <RecordView onStart={handleStartTraining} onPost={handlePostWorkout} onCancel={handleCancelTraining} myInfo={myInfo} gyms={allGyms} exercises={exercises} workoutItems={draftWorkoutItems} setWorkoutItems={setDraftWorkoutItems} selectedCategories={selectedCategories} setSelectedCategories={setSelectedCategories} posts={posts} currentUser={currentUser} isManual={isRecordManual} setIsManual={setIsRecordManual} onActiveExerciseChange={handleActiveExerciseChange} />}
         {currentTab === 'data' && <DataView posts={posts} currentUser={currentUser} partnerName={partnerName} accountsInfo={accountsInfo} onEdit={setEditingPost} onDelete={handleDeleteWorkout} onImport={handleImportWorkout} />}
-        {currentTab === 'friends' && <FriendsView partnerName={partnerName} partnerInfo={partnerInfo} currentUser={currentUser} posts={posts} accountsInfo={accountsInfo} />}
+        {currentTab === 'friends' && <FriendsView partnerName={partnerName} partnerInfo={partnerInfo} currentUser={currentUser} posts={posts} accountsInfo={accountsInfo} onTransferToWithFit={handleTransferToWithFit} />}
       </main>
 
       {editingPost && <EditWorkoutModal post={editingPost} gyms={allGyms} exercises={exercises} onClose={() => setEditingPost(null)} onSave={handleUpdateWorkout} myPastPosts={posts.filter(p => p.author === currentUser)} />}
@@ -3261,8 +3330,21 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo }) {
   );
 }
 // --- パートナー画面 ---
-function FriendsView({ partnerName, partnerInfo, currentUser, posts, accountsInfo }) {
+function FriendsView({ partnerName, partnerInfo, currentUser, posts, accountsInfo, onTransferToWithFit }) {
   const [currentTime, setCurrentTime] = useState(Date.now());
+  const [isTransferring, setIsTransferring] = useState(false);
+
+  const handleTransferClick = async () => {
+     if (!window.confirm("WithFitへデータを引き継ぎますか？\nすでにデータがある場合は最新の状態で上書き（更新）されます。")) return;
+     setIsTransferring(true);
+     const result = await onTransferToWithFit();
+     setIsTransferring(false);
+     if (result.success) {
+         alert("WithFitへのデータ引継ぎが完了しました！\nWithFitアプリでログインして確認してください。");
+     } else {
+         alert(result.message);
+     }
+  };
 
   useEffect(() => {
     // 5秒ごとに現在時刻を更新し、相手の最終アクセス時刻との差分をリアルタイムで再評価する
@@ -3421,8 +3503,24 @@ function FriendsView({ partnerName, partnerInfo, currentUser, posts, accountsInf
         </ul>
       </div>
 
+      <div className="bg-indigo-50 dark:bg-indigo-950/30 border border-indigo-200 dark:border-indigo-900 rounded-2xl p-5 mt-8 shadow-sm">
+         <h3 className="text-indigo-700 dark:text-indigo-300 font-bold mb-3 text-sm flex items-center gap-2">
+            <Download size={16}/> WithFitへデータを引き継ぐ
+         </h3>
+         <p className="text-[11px] text-indigo-600 dark:text-indigo-400 font-bold mb-4">
+            新しいアプリ「WithFit」へ、あなたのトレーニング記録と作成した種目データをコピーします。<br/>（何度実行してもデータが重複することはなく、最新の状態で上書き更新されます）
+         </p>
+         <button onClick={handleTransferClick} disabled={isTransferring} className="w-full bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-3 rounded-xl shadow-md transition-all disabled:opacity-50 flex items-center justify-center gap-2">
+            {isTransferring ? <Activity size={16} className="animate-spin" /> : <Download size={16} />}
+            {isTransferring ? '引継ぎ処理中...' : 'データを引き継ぐ'}
+         </button>
+         <p className="text-[10px] text-indigo-500/70 dark:text-indigo-400/70 font-bold mt-3 text-center">
+            引継ぎ完了後、WithFitで「{currentUser}」と現在のパスワードを入力するとログインできます。
+         </p>
+      </div>
+
       <div className="mt-12 text-center pb-4 border-t border-slate-200/50 dark:border-slate-800/50 pt-6">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">DuoFit v2.0.0 (2026.7.13, 15:51, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">DuoFit v2.0.0 (2026.7.16, 09:03, updated)</p>
         <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 mt-1">© 2026 Yuta Michitsuji. All rights reserved.</p>
       </div>
     </div>
