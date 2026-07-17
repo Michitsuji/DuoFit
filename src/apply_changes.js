@@ -50,7 +50,7 @@ try {
         }
     });
 
-    const versionRegex = /(DuoFit v\d+\.\d+\.\d+)(?: \([^)]+\))?/;
+    const versionRegex = /(WithFit v\d+\.\d+\.\d+)(?: \([^)]+\))?/;
     if (versionRegex.test(code)) {
         code = code.replace(versionRegex, `$1 (${currentDateTimeStr})`);
         console.log(`バージョン更新日時を (${currentDateTimeStr}) に自動更新しました。`);
